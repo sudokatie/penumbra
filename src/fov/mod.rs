@@ -1,3 +1,5 @@
 //! Field of view calculation.
 
-// TODO: Implement in Task 11
+mod shadowcast;
+
+pub use shadowcast::*;
