@@ -1,0 +1,32 @@
+[package]
+name = "penumbra"
+version = "0.1.0"
+edition = "2021"
+authors = ["Katie <blackabee@gmail.com>"]
+description = "A roguelike where dungeons generate from your git history"
+license = "MIT"
+repository = "https://github.com/sudokatie/penumbra"
+keywords = ["roguelike", "git", "terminal", "tui", "game"]
+categories = ["games", "command-line-utilities"]
+
+[dependencies]
+git2 = "0.19"
+ratatui = "0.28"
+crossterm = "0.28"
+chrono = { version = "0.4", features = ["serde"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+toml = "0.8"
+rand = "0.8"
+rand_chacha = "0.3"
+clap = { version = "4", features = ["derive"] }
+anyhow = "1.0"
+thiserror = "2.0"
+
+[dev-dependencies]
+tempfile = "3"
+
+[profile.release]
+lto = true
+strip = true
+codegen-units = 1
