@@ -31,8 +31,8 @@ pub fn play(git_path: &Path, days: u32, seed: Option<u64>, class: Option<PlayerC
             .as_secs()
     });
 
-    // Create game state with optional class
-    let state = GameState::new_with_class(commits, seed, class);
+    // Create game state with optional class (auto-detects if None)
+    let state = GameState::new_with_class(commits, seed, class, git_path.to_path_buf());
 
     println!("Created {} rooms", state.world.rooms.len());
     println!("Starting game...");

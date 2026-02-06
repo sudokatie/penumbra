@@ -3,7 +3,7 @@
 use chrono::NaiveDate;
 use penumbra::git::CommitData;
 use penumbra::world::{
-    calculate_room_size, determine_room_type, generate_dungeon, Direction, Room, RoomType, Tile,
+    calculate_room_size, determine_room_type, generate_dungeon, Direction, DoorState, Room, RoomType, Tile,
     World,
 };
 use chrono::Utc;
@@ -31,8 +31,13 @@ fn tile_wall_is_blocking() {
 }
 
 #[test]
-fn tile_door_is_walkable() {
-    assert!(Tile::Door(Direction::North).is_walkable());
+fn tile_door_open_is_walkable() {
+    assert!(Tile::Door(Direction::North, DoorState::Open).is_walkable());
+}
+
+#[test]
+fn tile_door_closed_not_walkable() {
+    assert!(!Tile::Door(Direction::North, DoorState::Closed).is_walkable());
 }
 
 #[test]
@@ -46,10 +51,30 @@ fn tile_entrance_is_walkable() {
 }
 
 #[test]
+fn tile_door_closed_blocks_vision() {
+    assert!(Tile::Door(Direction::North, DoorState::Closed).is_blocking());
+}
+
+#[test]
+fn tile_door_open_does_not_block_vision() {
+    assert!(!Tile::Door(Direction::North, DoorState::Open).is_blocking());
+}
+
+#[test]
+fn door_toggle_state() {
+    let mut tile = Tile::Door(Direction::North, DoorState::Closed);
+    tile.toggle_door();
+    assert_eq!(tile, Tile::Door(Direction::North, DoorState::Open));
+    tile.toggle_door();
+    assert_eq!(tile, Tile::Door(Direction::North, DoorState::Closed));
+}
+
+#[test]
 fn tile_symbols_correct() {
     assert_eq!(Tile::Floor.symbol(), '.');
     assert_eq!(Tile::Wall.symbol(), '#');
-    assert_eq!(Tile::Door(Direction::North).symbol(), '+');
+    assert_eq!(Tile::Door(Direction::North, DoorState::Closed).symbol(), '+');
+    assert_eq!(Tile::Door(Direction::North, DoorState::Open).symbol(), '/');
     assert_eq!(Tile::Exit.symbol(), '>');
     assert_eq!(Tile::Entrance.symbol(), '<');
 }

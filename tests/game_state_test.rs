@@ -1,5 +1,7 @@
 //! Tests for game state, death/victory, and room transitions.
 
+use std::path::PathBuf;
+
 use chrono::{NaiveDate, Utc};
 use rand::SeedableRng;
 use rand_chacha::ChaCha8Rng;
@@ -20,6 +22,10 @@ fn make_commit(msg: &str, lines: u32) -> CommitData {
         author: "Test".to_string(),
         is_merge: false,
     }
+}
+
+fn test_git_path() -> PathBuf {
+    PathBuf::from("/tmp/test-repo")
 }
 
 fn make_test_room(id: usize, enemies: bool, with_exit: bool) -> Room {
@@ -52,7 +58,7 @@ fn make_test_room(id: usize, enemies: bool, with_exit: bool) -> Room {
 #[test]
 fn game_starts_not_over() {
     let commits = vec![make_commit("Test", 50)];
-    let state = GameState::new(commits, 42);
+    let state = GameState::new(commits, 42, test_git_path());
     assert!(!state.game_over);
     assert!(!state.victory);
 }
@@ -70,7 +76,7 @@ fn game_over_on_player_death() {
     player.y = 2;
     player.hp = 1; // Nearly dead
     
-    let mut state = GameState::new(vec![make_commit("Test", 50)], 42);
+    let mut state = GameState::new(vec![make_commit("Test", 50)], 42, test_git_path());
     state.world = world;
     state.player = player;
     
@@ -93,7 +99,7 @@ fn victory_on_last_room_exit() {
     player.x = 5;
     player.y = 3; // At exit
     
-    let mut state = GameState::new(vec![make_commit("Test", 50)], 42);
+    let mut state = GameState::new(vec![make_commit("Test", 50)], 42, test_git_path());
     state.world = world;
     state.player = player;
     state.update_fov();
@@ -109,7 +115,7 @@ fn victory_on_last_room_exit() {
 #[test]
 fn game_tracks_turns() {
     let commits = vec![make_commit("Test", 50)];
-    let mut state = GameState::new(commits, 42);
+    let mut state = GameState::new(commits, 42, test_git_path());
     
     assert_eq!(state.turn, 0);
     
@@ -132,7 +138,7 @@ fn cannot_exit_with_enemies() {
     player.x = 5;
     player.y = 3; // At exit
     
-    let mut state = GameState::new(vec![make_commit("Test", 50)], 42);
+    let mut state = GameState::new(vec![make_commit("Test", 50)], 42, test_git_path());
     state.world = world;
     state.player = player;
     
@@ -153,7 +159,7 @@ fn can_exit_when_cleared() {
     player.x = 5;
     player.y = 3; // At exit
     
-    let mut state = GameState::new(vec![make_commit("Test", 50)], 42);
+    let mut state = GameState::new(vec![make_commit("Test", 50)], 42, test_git_path());
     state.world = world;
     state.player = player;
     
@@ -174,7 +180,7 @@ fn player_positioned_at_entrance_after_transition() {
     player.x = 5;
     player.y = 3;
     
-    let mut state = GameState::new(vec![make_commit("Test", 50)], 42);
+    let mut state = GameState::new(vec![make_commit("Test", 50)], 42, test_git_path());
     state.world = world;
     state.player = player;
     
@@ -195,7 +201,7 @@ fn fov_updates_after_transition() {
     player.x = 5;
     player.y = 3;
     
-    let mut state = GameState::new(vec![make_commit("Test", 50)], 42);
+    let mut state = GameState::new(vec![make_commit("Test", 50)], 42, test_git_path());
     state.world = world;
     state.player = player;
     state.update_fov();
@@ -220,7 +226,7 @@ fn transition_logs_room_info() {
     player.x = 5;
     player.y = 3;
     
-    let mut state = GameState::new(vec![make_commit("Test", 50)], 42);
+    let mut state = GameState::new(vec![make_commit("Test", 50)], 42, test_git_path());
     state.world = world;
     state.player = player;
     state.messages.clear();
@@ -275,7 +281,7 @@ fn sanctuary_regenerates_energy() {
     player.y = 3;
     player.energy = 50; // Start with half energy
     
-    let mut state = GameState::new(vec![make_commit("Test", 50)], 42);
+    let mut state = GameState::new(vec![make_commit("Test", 50)], 42, test_git_path());
     state.world = world;
     state.player = player;
     
@@ -311,14 +317,28 @@ fn sanctuary_has_no_enemies() {
 
 #[test]
 fn new_with_class_sets_class() {
-    let commits = vec![make_commit("Test", 50)];
-    let state = GameState::new_with_class(commits, 42, Some(PlayerClass::CodeWarrior));
+    let commits = vec![make_commit("Fix bug", 50)];
+    let state = GameState::new_with_class(commits, 42, Some(PlayerClass::CodeWarrior), test_git_path());
     assert_eq!(state.player.class, PlayerClass::CodeWarrior);
 }
 
 #[test]
-fn new_with_class_defaults_to_wanderer() {
-    let commits = vec![make_commit("Test", 50)];
-    let state = GameState::new_with_class(commits, 42, None);
+fn class_auto_detection_wanderer() {
+    // Few commits with varied messages -> Wanderer
+    let commits = vec![make_commit("Fix bug", 50)];
+    let state = GameState::new_with_class(commits, 42, None, test_git_path());
     assert_eq!(state.player.class, PlayerClass::Wanderer);
+}
+
+#[test]
+fn class_auto_detection_inbox_knight() {
+    // >30% test-related commits -> InboxKnight
+    let commits = vec![
+        make_commit("Add test for auth", 50),
+        make_commit("Fix tests", 50),
+        make_commit("Testing edge case", 50),
+        make_commit("Fix bug", 50),
+    ];
+    let state = GameState::new_with_class(commits, 42, None, test_git_path());
+    assert_eq!(state.player.class, PlayerClass::InboxKnight);
 }

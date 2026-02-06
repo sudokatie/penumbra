@@ -134,7 +134,7 @@ fn render_map(frame: &mut Frame, area: Rect, app: &App) {
                         let color = match tile {
                             crate::world::Tile::Floor => FLOOR_COLOR,
                             crate::world::Tile::Wall => WALL_COLOR,
-                            crate::world::Tile::Door(_) => DOOR_COLOR,
+                            crate::world::Tile::Door(_, _) => DOOR_COLOR,
                             crate::world::Tile::Exit => EXIT_COLOR,
                             crate::world::Tile::Entrance => ENTRANCE_COLOR,
                             crate::world::Tile::HealingZone => HEALING_ZONE_COLOR,
@@ -239,11 +239,72 @@ fn render_stats(frame: &mut Frame, area: Rect, app: &App) {
         )));
         lines.push(Line::from(room.room_type.name()));
         lines.push(Line::from(format!("{}", room.source_date)));
-        lines.push(Line::from(format!("Enemies: {}", room.enemies.len())));
+
+        // Enemy breakdown by type (spec requirement)
+        let enemy_breakdown = format_enemy_breakdown(&room.enemies);
+        lines.push(Line::from(enemy_breakdown));
+
+        // Commit source info (spec requirement)
+        if let Some(commit) = room.source_commits.first() {
+            let msg = commit.message.lines().next().unwrap_or("");
+            let msg_truncated = if msg.len() > 20 {
+                format!("{}...", &msg[..17])
+            } else {
+                msg.to_string()
+            };
+            lines.push(Line::from(""));
+            lines.push(Line::from(format!("\"{}\"", msg_truncated)));
+            lines.push(Line::from(format!(
+                "+{}/−{}",
+                commit.insertions, commit.deletions
+            )));
+        }
     }
 
     let para = Paragraph::new(lines).style(Style::default().fg(UI_TEXT));
     frame.render_widget(para, inner);
+}
+
+/// Format enemy breakdown by type.
+fn format_enemy_breakdown(enemies: &[crate::entity::Enemy]) -> String {
+    if enemies.is_empty() {
+        return "Enemies: 0".to_string();
+    }
+
+    use crate::entity::EnemyType;
+    let mut bugs = 0;
+    let mut regressions = 0;
+    let mut tech_debt = 0;
+    let mut merge_conflicts = 0;
+
+    for enemy in enemies {
+        match enemy.enemy_type {
+            EnemyType::Bug => bugs += 1,
+            EnemyType::Regression => regressions += 1,
+            EnemyType::TechDebt => tech_debt += 1,
+            EnemyType::MergeConflict => merge_conflicts += 1,
+        }
+    }
+
+    let mut parts = Vec::new();
+    if bugs > 0 {
+        parts.push(format!("{} Bug{}", bugs, if bugs > 1 { "s" } else { "" }));
+    }
+    if regressions > 0 {
+        parts.push(format!("{} Reg{}", regressions, if regressions > 1 { "s" } else { "" }));
+    }
+    if tech_debt > 0 {
+        parts.push(format!("{} Debt", tech_debt));
+    }
+    if merge_conflicts > 0 {
+        parts.push(format!("{} Merge", merge_conflicts));
+    }
+
+    if parts.is_empty() {
+        "Enemies: 0".to_string()
+    } else {
+        format!("Enemies: {}", parts.join(", "))
+    }
 }
 
 /// Render help overlay.

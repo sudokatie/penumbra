@@ -1,5 +1,9 @@
 //! Game state management.
 
+use std::collections::HashSet;
+use std::path::PathBuf;
+
+use chrono::{DateTime, Utc};
 use rand::prelude::*;
 use rand_chacha::ChaCha8Rng;
 use serde::{Deserialize, Serialize};
@@ -9,8 +13,6 @@ use crate::entity::{Enemy, Player, PlayerClass};
 use crate::fov::calculate_fov;
 use crate::git::CommitData;
 use crate::world::{generate_dungeon, Tile, World};
-
-use std::collections::HashSet;
 
 /// Events that occur during gameplay.
 #[derive(Debug, Clone)]
@@ -41,40 +43,29 @@ pub struct GameState {
     pub game_over: bool,
     pub victory: bool,
     pub seed: u64,
+    /// Path to the git repository used to generate this dungeon.
+    pub git_path: PathBuf,
+    /// When this game was started.
+    pub started_at: DateTime<Utc>,
 }
 
 impl GameState {
     /// Create a new game from git data.
-    pub fn new(git_data: Vec<CommitData>, seed: u64) -> Self {
-        let world = generate_dungeon(&git_data, seed);
-        let player = Player::new(PlayerClass::Wanderer);
-
-        let mut state = Self {
-            world,
-            player,
-            turn: 0,
-            visible_tiles: HashSet::new(),
-            messages: Vec::new(),
-            game_over: false,
-            victory: false,
-            seed,
-        };
-
-        // Position player at entrance of first room
-        if let Some(room) = state.world.current() {
-            state.player.x = 1;
-            state.player.y = room.height as i32 / 2;
-        }
-
-        state.update_fov();
-        state.log("You enter the dungeon generated from your git history...");
-        state
+    pub fn new(git_data: Vec<CommitData>, seed: u64, git_path: PathBuf) -> Self {
+        Self::new_with_class(git_data, seed, None, git_path)
     }
 
     /// Create a new game with an optional player class.
-    pub fn new_with_class(git_data: Vec<CommitData>, seed: u64, class: Option<PlayerClass>) -> Self {
+    /// If class is None, auto-detects from git patterns.
+    pub fn new_with_class(
+        git_data: Vec<CommitData>,
+        seed: u64,
+        class: Option<PlayerClass>,
+        git_path: PathBuf,
+    ) -> Self {
         let world = generate_dungeon(&git_data, seed);
-        let player_class = class.unwrap_or(PlayerClass::Wanderer);
+        // Auto-detect class from git patterns if not specified
+        let player_class = class.unwrap_or_else(|| PlayerClass::detect(&git_data));
         let player = Player::new(player_class);
 
         let mut state = Self {
@@ -86,6 +77,8 @@ impl GameState {
             game_over: false,
             victory: false,
             seed,
+            git_path,
+            started_at: Utc::now(),
         };
 
         // Position player at entrance of first room

@@ -3,6 +3,8 @@
 //! Note: These tests modify the user's save directory.
 //! Run with `cargo test save_test -- --test-threads=1` for isolation.
 
+use std::path::PathBuf;
+
 use chrono::Utc;
 use penumbra::game::{
     save_game, load_game, save_run_history, load_run_history, 
@@ -23,10 +25,14 @@ fn make_commit(msg: &str, lines: u32) -> CommitData {
     }
 }
 
+fn test_git_path() -> PathBuf {
+    PathBuf::from("/tmp/test-repo")
+}
+
 #[test]
 fn save_game_creates_file() {
     let commits = vec![make_commit("Test", 50)];
-    let state = GameState::new(commits, 42);
+    let state = GameState::new(commits, 42, test_git_path());
     
     let result = save_game(&state);
     assert!(result.is_ok());
@@ -88,7 +94,7 @@ fn run_record_with_death_cause() {
 #[test]
 fn game_state_serializable() {
     let commits = vec![make_commit("Test", 50)];
-    let state = GameState::new(commits, 42);
+    let state = GameState::new(commits, 42, test_git_path());
     
     // Test that state can be serialized
     let json = serde_json::to_string(&state);
@@ -98,7 +104,7 @@ fn game_state_serializable() {
 #[test]
 fn game_state_deserializable() {
     let commits = vec![make_commit("Test", 50)];
-    let state = GameState::new(commits, 42);
+    let state = GameState::new(commits, 42, test_git_path());
     
     let json = serde_json::to_string(&state).unwrap();
     let loaded: Result<GameState, _> = serde_json::from_str(&json);
@@ -108,7 +114,7 @@ fn game_state_deserializable() {
 #[test]
 fn game_state_roundtrip() {
     let commits = vec![make_commit("Test", 50)];
-    let mut state = GameState::new(commits, 42);
+    let mut state = GameState::new(commits, 42, test_git_path());
     state.turn = 99;
     
     let json = serde_json::to_string(&state).unwrap();

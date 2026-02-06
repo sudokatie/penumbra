@@ -247,3 +247,53 @@ fn enemy_type_base_damage() {
     assert_eq!(EnemyType::TechDebt.base_damage(), 4);
     assert_eq!(EnemyType::MergeConflict.base_damage(), 8);
 }
+
+// === Class Detection Tests ===
+
+use chrono::Utc;
+use penumbra::git::CommitData;
+
+fn make_commit(msg: &str, lines: u32) -> CommitData {
+    CommitData {
+        hash: format!("hash_{}", lines),
+        date: Utc::now(),
+        message: msg.to_string(),
+        insertions: lines,
+        deletions: 0,
+        files_changed: 1,
+        author: "Test".to_string(),
+        is_merge: false,
+    }
+}
+
+#[test]
+fn detect_wanderer_for_empty_commits() {
+    let commits: Vec<CommitData> = vec![];
+    assert_eq!(PlayerClass::detect(&commits), PlayerClass::Wanderer);
+}
+
+#[test]
+fn detect_wanderer_for_few_commits() {
+    let commits = vec![make_commit("Fix bug", 50)];
+    assert_eq!(PlayerClass::detect(&commits), PlayerClass::Wanderer);
+}
+
+#[test]
+fn detect_code_warrior_for_many_commits() {
+    let commits: Vec<CommitData> = (0..105)
+        .map(|i| make_commit(&format!("Commit {}", i), 50))
+        .collect();
+    assert_eq!(PlayerClass::detect(&commits), PlayerClass::CodeWarrior);
+}
+
+#[test]
+fn detect_inbox_knight_high_test_ratio() {
+    let commits = vec![
+        make_commit("Add test", 50),
+        make_commit("Fix test", 50),
+        make_commit("Test coverage", 50),
+        make_commit("Fix bug", 50),
+    ];
+    // 75% are test-related
+    assert_eq!(PlayerClass::detect(&commits), PlayerClass::InboxKnight);
+}
