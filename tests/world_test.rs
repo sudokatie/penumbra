@@ -301,3 +301,211 @@ fn world_is_last_room() {
     world.next_room();
     assert!(world.is_last_room());
 }
+
+// === Enemy Spawning Tests (Task 19) ===
+
+use penumbra::entity::EnemyType;
+use rand::SeedableRng;
+use rand_chacha::ChaCha8Rng;
+
+fn make_commit_typed(message: &str) -> CommitData {
+    CommitData {
+        hash: format!("hash_{}", message.len()),
+        date: Utc::now(),
+        message: message.to_string(),
+        insertions: 50,
+        deletions: 0,
+        files_changed: 1,
+        author: "Test".to_string(),
+        is_merge: false,
+    }
+}
+
+#[test]
+fn spawn_enemies_creates_enemies() {
+    let date = NaiveDate::from_ymd_opt(2026, 1, 1).unwrap();
+    let mut room = Room::new(0, 7, 7, RoomType::Normal, date);
+    let commits = vec![make_commit_typed("Fix bug"), make_commit_typed("Another fix")];
+    let mut rng = ChaCha8Rng::seed_from_u64(42);
+    room.spawn_enemies(&commits, &mut rng);
+    assert!(!room.enemies.is_empty());
+}
+
+#[test]
+fn spawn_enemies_respects_count_limit() {
+    let date = NaiveDate::from_ymd_opt(2026, 1, 1).unwrap();
+    let mut room = Room::new(0, 5, 5, RoomType::Normal, date);
+    // Small room (5x5 = 25 tiles, /4 = 6 max enemies)
+    let commits: Vec<_> = (0..20).map(|i| make_commit_typed(&format!("Commit {}", i))).collect();
+    let mut rng = ChaCha8Rng::seed_from_u64(42);
+    room.spawn_enemies(&commits, &mut rng);
+    // Should be capped by room size
+    assert!(room.enemies.len() <= 6);
+}
+
+#[test]
+fn spawn_enemies_bug_type_for_regular_commits() {
+    let date = NaiveDate::from_ymd_opt(2026, 1, 1).unwrap();
+    let mut room = Room::new(0, 7, 7, RoomType::Normal, date);
+    let commits = vec![make_commit_typed("Fix something")];
+    let mut rng = ChaCha8Rng::seed_from_u64(42);
+    room.spawn_enemies(&commits, &mut rng);
+    assert_eq!(room.enemies[0].enemy_type, EnemyType::Bug);
+}
+
+#[test]
+fn spawn_enemies_merge_conflict_for_merge() {
+    let date = NaiveDate::from_ymd_opt(2026, 1, 1).unwrap();
+    let mut room = Room::new(0, 7, 7, RoomType::Normal, date);
+    let commits = vec![make_commit_typed("Merge branch feature")];
+    let mut rng = ChaCha8Rng::seed_from_u64(42);
+    room.spawn_enemies(&commits, &mut rng);
+    assert_eq!(room.enemies[0].enemy_type, EnemyType::MergeConflict);
+}
+
+#[test]
+fn spawn_enemies_regression_for_revert() {
+    let date = NaiveDate::from_ymd_opt(2026, 1, 1).unwrap();
+    let mut room = Room::new(0, 7, 7, RoomType::Normal, date);
+    let commits = vec![make_commit_typed("Revert bad change")];
+    let mut rng = ChaCha8Rng::seed_from_u64(42);
+    room.spawn_enemies(&commits, &mut rng);
+    assert_eq!(room.enemies[0].enemy_type, EnemyType::Regression);
+}
+
+#[test]
+fn spawn_enemies_tech_debt_for_refactor() {
+    let date = NaiveDate::from_ymd_opt(2026, 1, 1).unwrap();
+    let mut room = Room::new(0, 7, 7, RoomType::Normal, date);
+    let commits = vec![make_commit_typed("Refactor auth module")];
+    let mut rng = ChaCha8Rng::seed_from_u64(42);
+    room.spawn_enemies(&commits, &mut rng);
+    assert_eq!(room.enemies[0].enemy_type, EnemyType::TechDebt);
+}
+
+#[test]
+fn spawn_enemies_positions_on_walkable_tiles() {
+    let date = NaiveDate::from_ymd_opt(2026, 1, 1).unwrap();
+    let mut room = Room::new(0, 7, 7, RoomType::Normal, date);
+    let commits = vec![make_commit_typed("Commit 1"), make_commit_typed("Commit 2")];
+    let mut rng = ChaCha8Rng::seed_from_u64(42);
+    room.spawn_enemies(&commits, &mut rng);
+    for enemy in &room.enemies {
+        assert!(room.is_walkable(enemy.x, enemy.y));
+    }
+}
+
+#[test]
+fn spawn_enemies_no_overlapping_positions() {
+    let date = NaiveDate::from_ymd_opt(2026, 1, 1).unwrap();
+    let mut room = Room::new(0, 9, 9, RoomType::Normal, date);
+    let commits: Vec<_> = (0..5).map(|i| make_commit_typed(&format!("Commit {}", i))).collect();
+    let mut rng = ChaCha8Rng::seed_from_u64(42);
+    room.spawn_enemies(&commits, &mut rng);
+    
+    let mut positions: Vec<_> = room.enemies.iter().map(|e| (e.x, e.y)).collect();
+    positions.sort();
+    let len_before = positions.len();
+    positions.dedup();
+    assert_eq!(len_before, positions.len());
+}
+
+// === Item Spawning Tests (Task 20) ===
+
+use penumbra::item::{ItemEffect, ItemType, Rarity};
+
+fn make_commit_lines(message: &str, lines: u32) -> CommitData {
+    CommitData {
+        hash: format!("hash_{}", message.len()),
+        date: Utc::now(),
+        message: message.to_string(),
+        insertions: lines,
+        deletions: 0,
+        files_changed: 1,
+        author: "Test".to_string(),
+        is_merge: false,
+    }
+}
+
+#[test]
+fn spawn_items_creates_items() {
+    let date = NaiveDate::from_ymd_opt(2026, 1, 1).unwrap();
+    let mut room = Room::new(0, 7, 7, RoomType::Normal, date);
+    let commits = vec![make_commit_typed("Some commit")];
+    let mut rng = ChaCha8Rng::seed_from_u64(42);
+    room.spawn_items(&commits, &mut rng);
+    assert!(!room.items.is_empty());
+}
+
+#[test]
+fn spawn_items_doc_commit_creates_scroll() {
+    let date = NaiveDate::from_ymd_opt(2026, 1, 1).unwrap();
+    let mut room = Room::new(0, 7, 7, RoomType::Normal, date);
+    let commits = vec![make_commit_typed("Update documentation")];
+    let mut rng = ChaCha8Rng::seed_from_u64(42);
+    room.spawn_items(&commits, &mut rng);
+    assert_eq!(room.items[0].item_type, ItemType::Scroll);
+    assert!(matches!(room.items[0].effect, ItemEffect::RevealMap));
+}
+
+#[test]
+fn spawn_items_test_commit_creates_health() {
+    let date = NaiveDate::from_ymd_opt(2026, 1, 1).unwrap();
+    let mut room = Room::new(0, 7, 7, RoomType::Normal, date);
+    let commits = vec![make_commit_typed("Add test for login")];
+    let mut rng = ChaCha8Rng::seed_from_u64(42);
+    room.spawn_items(&commits, &mut rng);
+    assert!(matches!(room.items[0].effect, ItemEffect::Heal(_)));
+}
+
+#[test]
+fn spawn_items_config_commit_creates_buff() {
+    let date = NaiveDate::from_ymd_opt(2026, 1, 1).unwrap();
+    let mut room = Room::new(0, 7, 7, RoomType::Normal, date);
+    let commits = vec![make_commit_typed("Update config file")];
+    let mut rng = ChaCha8Rng::seed_from_u64(42);
+    room.spawn_items(&commits, &mut rng);
+    assert!(matches!(room.items[0].effect, ItemEffect::Buff(_, _, _)));
+}
+
+#[test]
+fn spawn_items_treasure_room_gets_more() {
+    let date = NaiveDate::from_ymd_opt(2026, 1, 1).unwrap();
+    let mut room = Room::new(0, 9, 9, RoomType::Treasure, date);
+    let commits: Vec<_> = (0..5).map(|i| make_commit_typed(&format!("Commit {}", i))).collect();
+    let mut rng = ChaCha8Rng::seed_from_u64(42);
+    room.spawn_items(&commits, &mut rng);
+    // Treasure rooms get 2-3 items
+    assert!(room.items.len() >= 2);
+}
+
+#[test]
+fn spawn_items_rarity_scales_with_lines() {
+    let date = NaiveDate::from_ymd_opt(2026, 1, 1).unwrap();
+    
+    // Common: <50 lines
+    let mut room1 = Room::new(0, 7, 7, RoomType::Normal, date);
+    let commits1 = vec![make_commit_lines("Small fix", 30)];
+    let mut rng = ChaCha8Rng::seed_from_u64(42);
+    room1.spawn_items(&commits1, &mut rng);
+    assert_eq!(room1.items[0].rarity, Rarity::Common);
+    
+    // Legendary: >500 lines
+    let mut room2 = Room::new(1, 7, 7, RoomType::Normal, date);
+    let commits2 = vec![make_commit_lines("Huge feature", 600)];
+    let mut rng = ChaCha8Rng::seed_from_u64(42);
+    room2.spawn_items(&commits2, &mut rng);
+    assert_eq!(room2.items[0].rarity, Rarity::Legendary);
+}
+
+#[test]
+fn spawn_items_positions_on_walkable_tiles() {
+    let date = NaiveDate::from_ymd_opt(2026, 1, 1).unwrap();
+    let mut room = Room::new(0, 7, 7, RoomType::Normal, date);
+    let commits = vec![make_commit_typed("Commit 1")];
+    let mut rng = ChaCha8Rng::seed_from_u64(42);
+    room.spawn_items(&commits, &mut rng);
+    for item in &room.items {
+        assert!(room.is_walkable(item.x, item.y));
+    }
+}

@@ -1,11 +1,12 @@
 //! Room structure and generation.
 
 use chrono::NaiveDate;
+use rand::Rng;
 use serde::{Deserialize, Serialize};
 
-use crate::entity::Enemy;
+use crate::entity::{Enemy, EnemyType};
 use crate::git::CommitData;
-use crate::item::Item;
+use crate::item::{Item, ItemEffect, ItemType, Rarity};
 
 use super::{RoomType, Tile};
 
@@ -86,5 +87,151 @@ impl Room {
     /// Check if room is cleared of enemies.
     pub fn is_cleared(&self) -> bool {
         self.enemies.is_empty() || self.cleared
+    }
+
+    /// Get walkable positions not occupied by enemies or items.
+    fn get_free_positions(&self) -> Vec<(i32, i32)> {
+        let mut positions = Vec::new();
+        for y in 1..(self.height as i32 - 1) {
+            for x in 1..(self.width as i32 - 1) {
+                if self.is_walkable(x, y)
+                    && self.get_enemy_at(x, y).is_none()
+                    && self.get_item_at(x, y).is_none()
+                {
+                    positions.push((x, y));
+                }
+            }
+        }
+        positions
+    }
+
+    /// Determine enemy type from commit data.
+    fn enemy_type_from_commit(commit: &CommitData) -> EnemyType {
+        let msg = commit.message.to_lowercase();
+        if msg.contains("merge") {
+            EnemyType::MergeConflict
+        } else if msg.contains("revert") || msg.contains("rollback") {
+            EnemyType::Regression
+        } else if msg.contains("debt") || msg.contains("refactor") || msg.contains("cleanup") {
+            EnemyType::TechDebt
+        } else {
+            EnemyType::Bug
+        }
+    }
+
+    /// Spawn enemies based on commits.
+    ///
+    /// Count: min(commits.len(), room_size/4)
+    /// Type based on commit message keywords.
+    pub fn spawn_enemies<R: Rng>(&mut self, commits: &[CommitData], rng: &mut R) {
+        let room_size = (self.width as usize * self.height as usize) / 4;
+        let count = commits.len().min(room_size).min(10); // Cap at 10 enemies
+
+        let mut positions = self.get_free_positions();
+        if positions.is_empty() || count == 0 {
+            return;
+        }
+
+        for commit in commits.iter().take(count) {
+            if positions.is_empty() {
+                break;
+            }
+            let pos_idx = rng.gen_range(0..positions.len());
+            let (x, y) = positions.remove(pos_idx);
+            let enemy_type = Self::enemy_type_from_commit(commit);
+            let enemy = Enemy::new(enemy_type, x, y, &commit.hash);
+            self.enemies.push(enemy);
+        }
+    }
+
+    /// Determine rarity from commit size.
+    fn rarity_from_lines(lines: u32) -> Rarity {
+        if lines > 500 {
+            Rarity::Legendary
+        } else if lines > 200 {
+            Rarity::Rare
+        } else if lines > 50 {
+            Rarity::Uncommon
+        } else {
+            Rarity::Common
+        }
+    }
+
+    /// Create an item based on commit characteristics.
+    fn item_from_commit(commit: &CommitData) -> Item {
+        let msg = commit.message.to_lowercase();
+        let rarity = Self::rarity_from_lines(commit.lines_changed());
+
+        // Determine item based on commit type
+        let (name, item_type, effect) = if msg.contains("doc") || msg.contains("readme") {
+            // Doc commits: Map scrolls
+            ("Map Scroll".to_string(), ItemType::Scroll, ItemEffect::RevealMap)
+        } else if msg.contains("test") {
+            // Test commits: Healing
+            let heal = match rarity {
+                Rarity::Common => 10,
+                Rarity::Uncommon => 20,
+                Rarity::Rare => 35,
+                Rarity::Legendary => 50,
+            };
+            ("Health Potion".to_string(), ItemType::Consumable, ItemEffect::Heal(heal))
+        } else if msg.contains("config") || msg.contains("settings") {
+            // Config commits: Buffs
+            let amount = match rarity {
+                Rarity::Common => 2,
+                Rarity::Uncommon => 4,
+                Rarity::Rare => 6,
+                Rarity::Legendary => 10,
+            };
+            (
+                "Focus Crystal".to_string(),
+                ItemType::Consumable,
+                ItemEffect::Buff(crate::item::Stat::Focus, amount, 5),
+            )
+        } else {
+            // Default: energy restoration
+            let energy = match rarity {
+                Rarity::Common => 5,
+                Rarity::Uncommon => 10,
+                Rarity::Rare => 20,
+                Rarity::Legendary => 30,
+            };
+            ("Energy Vial".to_string(), ItemType::Consumable, ItemEffect::RestoreEnergy(energy))
+        };
+
+        Item::new(name, item_type, effect, rarity).from_commit(&commit.hash)
+    }
+
+    /// Spawn items based on commits and room type.
+    ///
+    /// - Doc commits: Map scrolls
+    /// - Test commits: Healing items
+    /// - Config commits: Buff items
+    /// - Treasure rooms: 2-3 items
+    pub fn spawn_items<R: Rng>(&mut self, commits: &[CommitData], rng: &mut R) {
+        let mut positions = self.get_free_positions();
+        if positions.is_empty() {
+            return;
+        }
+
+        // Treasure rooms get extra items
+        let item_count = match self.room_type {
+            RoomType::Treasure => rng.gen_range(2..=3),
+            _ => {
+                // Normal rooms: ~1 item per 3-4 commits
+                let base = commits.len() / 4;
+                base.max(1).min(3)
+            }
+        };
+
+        for commit in commits.iter().take(item_count) {
+            if positions.is_empty() {
+                break;
+            }
+            let pos_idx = rng.gen_range(0..positions.len());
+            let (x, y) = positions.remove(pos_idx);
+            let item = Self::item_from_commit(commit).at(x, y);
+            self.items.push(item);
+        }
     }
 }

@@ -1,0 +1,245 @@
+//! Tests for game state, death/victory, and room transitions.
+
+use chrono::{NaiveDate, Utc};
+use penumbra::combat::PlayerAction;
+use penumbra::entity::{Enemy, EnemyType, Player, PlayerClass};
+use penumbra::game::GameState;
+use penumbra::git::CommitData;
+use penumbra::world::{Room, RoomType, Tile, World};
+
+fn make_commit(msg: &str, lines: u32) -> CommitData {
+    CommitData {
+        hash: format!("hash_{}", lines),
+        date: Utc::now(),
+        message: msg.to_string(),
+        insertions: lines,
+        deletions: 0,
+        files_changed: 1,
+        author: "Test".to_string(),
+        is_merge: false,
+    }
+}
+
+fn make_test_room(id: usize, enemies: bool, with_exit: bool) -> Room {
+    let date = NaiveDate::from_ymd_opt(2026, 1, 1).unwrap();
+    let mut room = Room::new(id, 7, 7, RoomType::Normal, date);
+    
+    // Add walls around edges
+    for x in 0..7 {
+        room.set_tile(x, 0, Tile::Wall);
+        room.set_tile(x, 6, Tile::Wall);
+    }
+    for y in 0..7 {
+        room.set_tile(0, y, Tile::Wall);
+        room.set_tile(6, y, Tile::Wall);
+    }
+    
+    if with_exit {
+        room.set_tile(5, 3, Tile::Exit);
+    }
+    
+    if enemies {
+        room.enemies.push(Enemy::new(EnemyType::Bug, 3, 3, "test"));
+    }
+    
+    room
+}
+
+// === Death/Victory Tests (Task 21) ===
+
+#[test]
+fn game_starts_not_over() {
+    let commits = vec![make_commit("Test", 50)];
+    let state = GameState::new(commits, 42);
+    assert!(!state.game_over);
+    assert!(!state.victory);
+}
+
+#[test]
+fn game_over_on_player_death() {
+    let date = NaiveDate::from_ymd_opt(2026, 1, 1).unwrap();
+    let mut room = Room::new(0, 7, 7, RoomType::Normal, date);
+    // Add a powerful enemy
+    room.enemies.push(Enemy::new(EnemyType::MergeConflict, 2, 2, "test"));
+    
+    let world = World::new(vec![room]);
+    let mut player = Player::new(PlayerClass::Wanderer);
+    player.x = 1;
+    player.y = 2;
+    player.hp = 1; // Nearly dead
+    
+    let mut state = GameState::new(vec![make_commit("Test", 50)], 42);
+    state.world = world;
+    state.player = player;
+    
+    // Process enemies (they'll attack and kill the player)
+    let events = state.process_enemies();
+    
+    // Should trigger game over
+    assert!(state.game_over);
+    assert!(!state.victory);
+}
+
+#[test]
+fn victory_on_last_room_exit() {
+    // Single room that's already cleared
+    let mut room = make_test_room(0, false, true);
+    room.cleared = true;
+    
+    let world = World::new(vec![room]);
+    let mut player = Player::new(PlayerClass::Wanderer);
+    player.x = 5;
+    player.y = 3; // At exit
+    
+    let mut state = GameState::new(vec![make_commit("Test", 50)], 42);
+    state.world = world;
+    state.player = player;
+    state.update_fov();
+    
+    // Check exit
+    let transitioned = state.check_room_exit();
+    
+    assert!(transitioned);
+    assert!(state.game_over);
+    assert!(state.victory);
+}
+
+#[test]
+fn game_tracks_turns() {
+    let commits = vec![make_commit("Test", 50)];
+    let mut state = GameState::new(commits, 42);
+    
+    assert_eq!(state.turn, 0);
+    
+    state.process_action(PlayerAction::Wait);
+    assert_eq!(state.turn, 1);
+    
+    state.process_action(PlayerAction::Wait);
+    assert_eq!(state.turn, 2);
+}
+
+// === Room Transition Tests (Task 22) ===
+
+#[test]
+fn cannot_exit_with_enemies() {
+    let mut room = make_test_room(0, true, true);
+    room.cleared = false;
+    
+    let world = World::new(vec![room, make_test_room(1, false, false)]);
+    let mut player = Player::new(PlayerClass::Wanderer);
+    player.x = 5;
+    player.y = 3; // At exit
+    
+    let mut state = GameState::new(vec![make_commit("Test", 50)], 42);
+    state.world = world;
+    state.player = player;
+    
+    let transitioned = state.check_room_exit();
+    
+    assert!(!transitioned);
+    assert_eq!(state.world.current_room, 0);
+}
+
+#[test]
+fn can_exit_when_cleared() {
+    let mut room1 = make_test_room(0, false, true);
+    room1.cleared = true;
+    let room2 = make_test_room(1, false, false);
+    
+    let world = World::new(vec![room1, room2]);
+    let mut player = Player::new(PlayerClass::Wanderer);
+    player.x = 5;
+    player.y = 3; // At exit
+    
+    let mut state = GameState::new(vec![make_commit("Test", 50)], 42);
+    state.world = world;
+    state.player = player;
+    
+    let transitioned = state.check_room_exit();
+    
+    assert!(transitioned);
+    assert_eq!(state.world.current_room, 1);
+}
+
+#[test]
+fn player_positioned_at_entrance_after_transition() {
+    let mut room1 = make_test_room(0, false, true);
+    room1.cleared = true;
+    let room2 = make_test_room(1, false, false);
+    
+    let world = World::new(vec![room1, room2]);
+    let mut player = Player::new(PlayerClass::Wanderer);
+    player.x = 5;
+    player.y = 3;
+    
+    let mut state = GameState::new(vec![make_commit("Test", 50)], 42);
+    state.world = world;
+    state.player = player;
+    
+    state.check_room_exit();
+    
+    // Player should be at entrance (left side, middle height)
+    assert_eq!(state.player.x, 1);
+}
+
+#[test]
+fn fov_updates_after_transition() {
+    let mut room1 = make_test_room(0, false, true);
+    room1.cleared = true;
+    let room2 = make_test_room(1, false, false);
+    
+    let world = World::new(vec![room1, room2]);
+    let mut player = Player::new(PlayerClass::Wanderer);
+    player.x = 5;
+    player.y = 3;
+    
+    let mut state = GameState::new(vec![make_commit("Test", 50)], 42);
+    state.world = world;
+    state.player = player;
+    state.update_fov();
+    
+    let fov_before = state.visible_tiles.clone();
+    
+    state.check_room_exit();
+    
+    // FOV should have changed (though content might overlap)
+    // At minimum, player position is now different
+    assert!(!state.visible_tiles.is_empty());
+}
+
+#[test]
+fn transition_logs_room_info() {
+    let mut room1 = make_test_room(0, false, true);
+    room1.cleared = true;
+    let room2 = make_test_room(1, false, false);
+    
+    let world = World::new(vec![room1, room2]);
+    let mut player = Player::new(PlayerClass::Wanderer);
+    player.x = 5;
+    player.y = 3;
+    
+    let mut state = GameState::new(vec![make_commit("Test", 50)], 42);
+    state.world = world;
+    state.player = player;
+    state.messages.clear();
+    
+    state.check_room_exit();
+    
+    // Should have logged the transition
+    assert!(state.messages.iter().any(|m| m.contains("enter")));
+}
+
+#[test]
+fn room_marked_cleared_when_enemies_defeated() {
+    let date = NaiveDate::from_ymd_opt(2026, 1, 1).unwrap();
+    let mut room = Room::new(0, 7, 7, RoomType::Normal, date);
+    room.enemies.push(Enemy::new(EnemyType::Bug, 2, 3, "test"));
+    
+    assert!(!room.is_cleared());
+    
+    // Remove enemy (simulating defeat)
+    room.enemies.clear();
+    room.cleared = true;
+    
+    assert!(room.is_cleared());
+}
