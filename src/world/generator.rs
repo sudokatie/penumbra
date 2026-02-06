@@ -48,7 +48,8 @@ pub fn generate_room(
 /// Calculate room dimensions from total lines changed.
 pub fn calculate_room_size(total_lines: u32) -> (u8, u8) {
     match total_lines {
-        0..=49 => (5, 5),
+        0..=19 => (3, 3),
+        20..=49 => (5, 5),
         50..=199 => (7, 7),
         200..=499 => (9, 9),
         _ => (11, 11),

@@ -2,9 +2,30 @@
 
 use std::path::PathBuf;
 
-use clap::{Parser, Subcommand};
+use clap::{Parser, Subcommand, ValueEnum};
 
 use penumbra::cli;
+use penumbra::entity::PlayerClass;
+
+/// Player class for CLI parsing.
+#[derive(Debug, Clone, Copy, ValueEnum)]
+enum CliPlayerClass {
+    CodeWarrior,
+    MeetingSurvivor,
+    InboxKnight,
+    Wanderer,
+}
+
+impl From<CliPlayerClass> for PlayerClass {
+    fn from(c: CliPlayerClass) -> Self {
+        match c {
+            CliPlayerClass::CodeWarrior => PlayerClass::CodeWarrior,
+            CliPlayerClass::MeetingSurvivor => PlayerClass::MeetingSurvivor,
+            CliPlayerClass::InboxKnight => PlayerClass::InboxKnight,
+            CliPlayerClass::Wanderer => PlayerClass::Wanderer,
+        }
+    }
+}
 
 #[derive(Parser)]
 #[command(name = "penumbra")]
@@ -30,6 +51,10 @@ enum Commands {
         /// RNG seed for reproducibility
         #[arg(long)]
         seed: Option<u64>,
+
+        /// Player class
+        #[arg(long, value_enum)]
+        class: Option<CliPlayerClass>,
     },
 
     /// Continue saved game
@@ -43,8 +68,8 @@ fn main() {
     let cli = Cli::parse();
 
     let result = match cli.command {
-        Commands::Play { git, days, seed } => {
-            cli::play(&git, days, seed, None)
+        Commands::Play { git, days, seed, class } => {
+            cli::play(&git, days, seed, class.map(|c| c.into()))
         }
         Commands::Continue => {
             cli::continue_game()

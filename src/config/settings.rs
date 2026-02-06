@@ -111,16 +111,13 @@ pub fn load_settings() -> Settings {
     let path = config_path();
     
     if !path.exists() {
-        return default_settings();
+        return Settings::default();
     }
 
-    match fs::read_to_string(&path) {
-        Ok(content) => match toml::from_str(&content) {
-            Ok(settings) => settings,
-            Err(_) => default_settings(),
-        },
-        Err(_) => default_settings(),
-    }
+    fs::read_to_string(&path)
+        .ok()
+        .and_then(|content| toml::from_str(&content).ok())
+        .unwrap_or_default()
 }
 
 /// Save settings to config file.

@@ -73,6 +73,7 @@ fn transform_octant(octant: u8, x: i32, y: i32) -> (i32, i32) {
 }
 
 /// Recursive shadowcasting for one octant.
+#[allow(clippy::too_many_arguments)]
 fn cast_light<F>(
     visible: &mut HashSet<(i32, i32)>,
     origin: (i32, i32),

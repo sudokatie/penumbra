@@ -8,7 +8,7 @@ use crate::combat::{enemy_attack, player_attack, EnemyAction, PlayerAction, WAIT
 use crate::entity::{Enemy, Player, PlayerClass};
 use crate::fov::calculate_fov;
 use crate::git::CommitData;
-use crate::world::{generate_dungeon, Room, Tile, World};
+use crate::world::{generate_dungeon, Tile, World};
 
 use std::collections::HashSet;
 
@@ -71,6 +71,34 @@ impl GameState {
         state
     }
 
+    /// Create a new game with an optional player class.
+    pub fn new_with_class(git_data: Vec<CommitData>, seed: u64, class: Option<PlayerClass>) -> Self {
+        let world = generate_dungeon(&git_data, seed);
+        let player_class = class.unwrap_or(PlayerClass::Wanderer);
+        let player = Player::new(player_class);
+
+        let mut state = Self {
+            world,
+            player,
+            turn: 0,
+            visible_tiles: HashSet::new(),
+            messages: Vec::new(),
+            game_over: false,
+            victory: false,
+            seed,
+        };
+
+        // Position player at entrance of first room
+        if let Some(room) = state.world.current() {
+            state.player.x = 1;
+            state.player.y = room.height as i32 / 2;
+        }
+
+        state.update_fov();
+        state.log(format!("You enter as a {:?}...", player_class));
+        state
+    }
+
     /// Process a player action and return events.
     pub fn process_action(&mut self, action: PlayerAction) -> Vec<GameEvent> {
         if self.game_over {
@@ -91,11 +119,11 @@ impl GameState {
                 let new_x = self.player.x + dx;
                 let new_y = self.player.y + dy;
 
-                let can_move = self.world.current().map_or(false, |room| {
+                let can_move = self.world.current().is_some_and(|room| {
                     room.is_walkable(new_x, new_y) && room.get_enemy_at(new_x, new_y).is_none()
                 });
 
-                let blocked_by_enemy = self.world.current().map_or(false, |room| {
+                let blocked_by_enemy = self.world.current().is_some_and(|room| {
                     room.get_enemy_at(new_x, new_y).is_some()
                 });
 
@@ -155,7 +183,7 @@ impl GameState {
                             events.push(GameEvent::PlayerLevelUp {
                                 level: self.player.level,
                             });
-                            self.log(&format!("Level up! You are now level {}.", self.player.level));
+                            self.log(format!("Level up! You are now level {}.", self.player.level));
                         }
 
                         events.push(GameEvent::EnemyKilled {
@@ -200,6 +228,15 @@ impl GameState {
         }
 
         self.turn += 1;
+        
+        // Sanctuary rooms regenerate energy
+        let in_sanctuary = self.world.current().is_some_and(|room| {
+            room.room_type == crate::world::RoomType::Sanctuary
+        });
+        if in_sanctuary {
+            self.player.regen_energy(5);
+        }
+        
         events
     }
 
@@ -217,7 +254,7 @@ impl GameState {
 
         for i in 0..enemy_count {
             // Re-check bounds each iteration (enemies might be removed)
-            let enemy_exists = self.world.current().map_or(false, |r| i < r.enemies.len());
+            let enemy_exists = self.world.current().is_some_and(|r| i < r.enemies.len());
             if !enemy_exists {
                 continue;
             }
@@ -229,9 +266,6 @@ impl GameState {
                 (e.x, e.y, e.enemy_type, e.hp, e.max_hp, e.damage, e.turns_alive)
             };
 
-            // Create a temporary enemy for AI decision
-            let temp_enemy = Enemy::new(enemy_type, enemy_x, enemy_y, "");
-            
             // Decide action based on enemy type and position
             let player_x = self.player.x;
             let player_y = self.player.y;
@@ -267,7 +301,7 @@ impl GameState {
                 EnemyAction::Move { dx, dy } => {
                     let new_x = enemy_x + dx;
                     let new_y = enemy_y + dy;
-                    let can_move = self.world.current().map_or(false, |r| r.is_walkable(new_x, new_y));
+                    let can_move = self.world.current().is_some_and(|r| r.is_walkable(new_x, new_y));
                     if can_move {
                         if let Some(room) = self.world.current_mut() {
                             room.enemies[i].x = new_x;
@@ -308,7 +342,61 @@ impl GameState {
                         room.enemies[i].turns_alive += 1;
                     }
                 }
-                EnemyAction::Split | EnemyAction::Wait => {
+                EnemyAction::Split => {
+                    // MergeConflict splits into two weaker enemies
+                    let split_info = if let Some(room) = self.world.current() {
+                        let original = &room.enemies[i];
+                        let half_hp = original.max_hp / 2;
+                        let half_damage = original.damage / 2;
+                        let (ox, oy) = (original.x, original.y);
+                        let commit = original.source_commit.clone();
+                        
+                        // Find adjacent empty positions for the split
+                        let mut split_pos = None;
+                        for (dx, dy) in [(0, -1), (0, 1), (-1, 0), (1, 0)] {
+                            let (nx, ny) = (ox + dx, oy + dy);
+                            if room.is_walkable(nx, ny) 
+                                && room.get_enemy_at(nx, ny).is_none()
+                                && !(nx == player_x && ny == player_y) 
+                            {
+                                split_pos = Some((nx, ny));
+                                break;
+                            }
+                        }
+                        Some((half_hp, half_damage, commit, split_pos))
+                    } else {
+                        None
+                    };
+                    
+                    if let Some((half_hp, half_damage, commit, split_pos)) = split_info {
+                        if let Some((nx, ny)) = split_pos {
+                            // Create a new weaker Bug enemy at split position
+                            let mut split_enemy = Enemy::new(
+                                crate::entity::EnemyType::Bug,
+                                nx, ny,
+                                &commit
+                            );
+                            split_enemy.hp = half_hp.max(5);
+                            split_enemy.max_hp = half_hp.max(5);
+                            split_enemy.damage = half_damage.max(2);
+                            
+                            if let Some(room) = self.world.current_mut() {
+                                room.enemies.push(split_enemy);
+                                
+                                // Weaken the original
+                                room.enemies[i].hp = half_hp.max(5);
+                                room.enemies[i].max_hp = half_hp.max(5);
+                                room.enemies[i].damage = half_damage.max(2);
+                                room.enemies[i].turns_alive += 1;
+                            }
+                            
+                            self.log("The Merge Conflict splits in two!");
+                        } else if let Some(room) = self.world.current_mut() {
+                            room.enemies[i].turns_alive += 1;
+                        }
+                    }
+                }
+                EnemyAction::Wait => {
                     if let Some(room) = self.world.current_mut() {
                         room.enemies[i].turns_alive += 1;
                     }
@@ -321,7 +409,7 @@ impl GameState {
 
     /// Check if player is at room exit and handle transition.
     pub fn check_room_exit(&mut self) -> bool {
-        let at_exit = self.world.current().map_or(false, |room| {
+        let at_exit = self.world.current().is_some_and(|room| {
             matches!(room.get_tile(self.player.x, self.player.y), Some(Tile::Exit))
         });
 
@@ -329,7 +417,7 @@ impl GameState {
             return false;
         }
 
-        let is_cleared = self.world.current().map_or(false, |room| room.is_cleared());
+        let is_cleared = self.world.current().is_some_and(|room| room.is_cleared());
         if !is_cleared {
             self.log("You must defeat all enemies before leaving!");
             return false;
@@ -354,7 +442,7 @@ impl GameState {
             }
             
             self.update_fov();
-            self.log(&format!("You enter {} ({})", room_name, room_date));
+            self.log(format!("You enter {} ({})", room_name, room_date));
             return true;
         }
 

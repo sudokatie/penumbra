@@ -1,6 +1,8 @@
 //! Tests for game state, death/victory, and room transitions.
 
 use chrono::{NaiveDate, Utc};
+use rand::SeedableRng;
+use rand_chacha::ChaCha8Rng;
 use penumbra::combat::PlayerAction;
 use penumbra::entity::{Enemy, EnemyType, Player, PlayerClass};
 use penumbra::game::GameState;
@@ -242,4 +244,81 @@ fn room_marked_cleared_when_enemies_defeated() {
     room.cleared = true;
     
     assert!(room.is_cleared());
+}
+
+// === Sanctuary Tests ===
+
+fn make_sanctuary_room(id: usize) -> Room {
+    let date = NaiveDate::from_ymd_opt(2026, 1, 1).unwrap();
+    let mut room = Room::new(id, 7, 7, RoomType::Sanctuary, date);
+    
+    // Add walls around edges
+    for x in 0..7 {
+        room.set_tile(x, 0, Tile::Wall);
+        room.set_tile(x, 6, Tile::Wall);
+    }
+    for y in 0..7 {
+        room.set_tile(0, y, Tile::Wall);
+        room.set_tile(6, y, Tile::Wall);
+    }
+    
+    room
+}
+
+#[test]
+fn sanctuary_regenerates_energy() {
+    let room = make_sanctuary_room(0);
+    let world = World::new(vec![room]);
+    
+    let mut player = Player::new(PlayerClass::Wanderer);
+    player.x = 3;
+    player.y = 3;
+    player.energy = 50; // Start with half energy
+    
+    let mut state = GameState::new(vec![make_commit("Test", 50)], 42);
+    state.world = world;
+    state.player = player;
+    
+    // Process an action (Wait)
+    state.process_action(PlayerAction::Wait);
+    
+    // Should have +2 from Wait + 5 from Sanctuary = 57
+    assert!(state.player.energy > 52);
+}
+
+#[test]
+fn sanctuary_has_no_enemies() {
+    use rand::SeedableRng;
+    use rand_chacha::ChaCha8Rng;
+    
+    let date = NaiveDate::from_ymd_opt(2026, 1, 1).unwrap();
+    let mut room = Room::new(0, 7, 7, RoomType::Sanctuary, date);
+    
+    let commits = vec![
+        make_commit("Test 1", 50),
+        make_commit("Test 2", 50),
+        make_commit("Test 3", 50),
+    ];
+    
+    let mut rng = ChaCha8Rng::seed_from_u64(42);
+    room.spawn_enemies(&commits, &mut rng);
+    
+    // Sanctuary rooms should never have enemies
+    assert!(room.enemies.is_empty());
+}
+
+// === Class Tests ===
+
+#[test]
+fn new_with_class_sets_class() {
+    let commits = vec![make_commit("Test", 50)];
+    let state = GameState::new_with_class(commits, 42, Some(PlayerClass::CodeWarrior));
+    assert_eq!(state.player.class, PlayerClass::CodeWarrior);
+}
+
+#[test]
+fn new_with_class_defaults_to_wanderer() {
+    let commits = vec![make_commit("Test", 50)];
+    let state = GameState::new_with_class(commits, 42, None);
+    assert_eq!(state.player.class, PlayerClass::Wanderer);
 }

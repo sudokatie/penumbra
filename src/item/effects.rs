@@ -19,8 +19,26 @@ pub fn apply_effect(effect: &ItemEffect, player: &mut Player) -> String {
             format!("Restored {} energy", amount)
         }
         ItemEffect::Damage(_) => "Damage items target enemies".to_string(),
-        ItemEffect::Buff(stat, amount, duration) => {
-            format!("Buffed {:?} by {} for {} turns", stat, amount, duration)
+        ItemEffect::Buff(stat, amount, _duration) => {
+            // Apply the stat buff immediately (permanent for MVP)
+            match stat {
+                super::Stat::MaxHP => {
+                    player.max_hp += *amount;
+                    player.hp += *amount;
+                }
+                super::Stat::MaxEnergy => {
+                    player.max_energy += *amount;
+                    player.energy += *amount;
+                }
+                super::Stat::Focus => {
+                    player.focus += *amount;
+                    player.max_focus += *amount;
+                }
+                super::Stat::Damage => {
+                    player.damage += *amount;
+                }
+            }
+            format!("Increased {:?} by {}", stat, amount)
         }
         ItemEffect::RevealMap => "Map revealed".to_string(),
     }

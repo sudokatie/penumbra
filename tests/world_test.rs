@@ -171,8 +171,14 @@ fn make_commit(lines: u32, is_merge: bool, message: &str) -> CommitData {
 }
 
 #[test]
+fn calculate_room_size_tiny() {
+    assert_eq!(calculate_room_size(0), (3, 3));
+    assert_eq!(calculate_room_size(19), (3, 3));
+}
+
+#[test]
 fn calculate_room_size_small() {
-    assert_eq!(calculate_room_size(0), (5, 5));
+    assert_eq!(calculate_room_size(20), (5, 5));
     assert_eq!(calculate_room_size(49), (5, 5));
 }
 

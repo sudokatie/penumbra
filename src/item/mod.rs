@@ -1,9 +1,9 @@
 //! Items and effects.
 
+mod definition;
 mod effects;
-mod item;
 mod types;
 
+pub use definition::*;
 pub use effects::*;
-pub use item::*;
 pub use types::*;

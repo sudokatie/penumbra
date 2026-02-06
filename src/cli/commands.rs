@@ -14,7 +14,7 @@ use crate::git::parse_repository;
 use crate::ui::App;
 
 /// Start a new game.
-pub fn play(git_path: &Path, days: u32, seed: Option<u64>, _class: Option<PlayerClass>) -> Result<()> {
+pub fn play(git_path: &Path, days: u32, seed: Option<u64>, class: Option<PlayerClass>) -> Result<()> {
     // Parse git repository
     let commits = parse_repository(git_path, days)
         .context("Failed to parse git repository")?;
@@ -31,8 +31,8 @@ pub fn play(git_path: &Path, days: u32, seed: Option<u64>, _class: Option<Player
             .as_secs()
     });
 
-    // Create game state
-    let state = GameState::new(commits, seed);
+    // Create game state with optional class
+    let state = GameState::new_with_class(commits, seed, class);
 
     println!("Created {} rooms", state.world.rooms.len());
     println!("Starting game...");

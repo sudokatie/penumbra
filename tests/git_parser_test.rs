@@ -214,3 +214,30 @@ fn commit_date_is_recent() {
         assert!(diff.num_minutes() < 5);
     }
 }
+
+#[test]
+fn commit_hash_is_40_chars() {
+    let repo = create_test_repo();
+    let commits = parse_repository(repo.path(), 30).unwrap();
+    for commit in commits {
+        assert_eq!(commit.hash.len(), 40);
+    }
+}
+
+#[test]
+fn commit_message_preserved() {
+    let repo = create_test_repo();
+    let commits = parse_repository(repo.path(), 30).unwrap();
+    // Should have "Initial commit", "Add main", "Add test"
+    let messages: Vec<_> = commits.iter().map(|c| c.message.trim()).collect();
+    assert!(messages.iter().any(|m| m.contains("Initial")));
+}
+
+#[test]
+fn commit_author_preserved() {
+    let repo = create_test_repo();
+    let commits = parse_repository(repo.path(), 30).unwrap();
+    for commit in commits {
+        assert_eq!(commit.author, "Test");
+    }
+}

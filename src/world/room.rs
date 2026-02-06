@@ -123,7 +123,13 @@ impl Room {
     ///
     /// Count: min(commits.len(), room_size/4)
     /// Type based on commit message keywords.
+    /// Sanctuary rooms have no enemies.
     pub fn spawn_enemies<R: Rng>(&mut self, commits: &[CommitData], rng: &mut R) {
+        // Sanctuary rooms are safe - no enemies spawn
+        if self.room_type == RoomType::Sanctuary {
+            return;
+        }
+        
         let room_size = (self.width as usize * self.height as usize) / 4;
         let count = commits.len().min(room_size).min(10); // Cap at 10 enemies
 
@@ -220,7 +226,7 @@ impl Room {
             _ => {
                 // Normal rooms: ~1 item per 3-4 commits
                 let base = commits.len() / 4;
-                base.max(1).min(3)
+                base.clamp(1, 3)
             }
         };
 
