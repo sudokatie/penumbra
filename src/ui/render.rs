@@ -137,6 +137,7 @@ fn render_map(frame: &mut Frame, area: Rect, app: &App) {
                             crate::world::Tile::Door(_) => DOOR_COLOR,
                             crate::world::Tile::Exit => EXIT_COLOR,
                             crate::world::Tile::Entrance => ENTRANCE_COLOR,
+                            crate::world::Tile::HealingZone => HEALING_ZONE_COLOR,
                         };
                         (tile.symbol(), color)
                     } else {

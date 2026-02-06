@@ -8,6 +8,7 @@ pub const WALL_COLOR: Color = Color::Gray;
 pub const DOOR_COLOR: Color = Color::Yellow;
 pub const EXIT_COLOR: Color = Color::Green;
 pub const ENTRANCE_COLOR: Color = Color::Cyan;
+pub const HEALING_ZONE_COLOR: Color = Color::LightGreen;
 pub const FOG_COLOR: Color = Color::Rgb(40, 40, 40);
 
 // Entity colors

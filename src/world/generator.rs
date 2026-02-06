@@ -46,13 +46,13 @@ pub fn generate_room(
 }
 
 /// Calculate room dimensions from total lines changed.
+/// Spec: Room size 3x3 to 9x9 based on lines changed.
 pub fn calculate_room_size(total_lines: u32) -> (u8, u8) {
     match total_lines {
         0..=19 => (3, 3),
         20..=49 => (5, 5),
         50..=199 => (7, 7),
-        200..=499 => (9, 9),
-        _ => (11, 11),
+        _ => (9, 9), // Max 9x9 per spec
     }
 }
 
@@ -107,6 +107,15 @@ fn generate_layout(room: &mut Room, _rng: &mut impl Rng) {
     for y in 0..h {
         room.set_tile(0, y, Tile::Wall);
         room.set_tile(w - 1, y, Tile::Wall);
+    }
+
+    // Sanctuary rooms have healing zone tiles on floor
+    if room.room_type == RoomType::Sanctuary {
+        for y in 1..(h - 1) {
+            for x in 1..(w - 1) {
+                room.set_tile(x, y, Tile::HealingZone);
+            }
+        }
     }
 
     // Boss rooms are larger with clear center

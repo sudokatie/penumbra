@@ -92,7 +92,7 @@ pub fn enemy_attack(enemy: &Enemy, player: &mut Player, rng: &mut impl Rng) -> C
 /// Calculate hit chance based on focus stat.
 /// Base 80%, +1% per 10 focus. Min 5%, max 95%.
 pub fn calculate_hit_chance(focus: i32) -> f32 {
-    let chance = 0.80 + (focus as f32 / 1000.0);
+    let chance = 0.80 + (focus as f32 / 10.0 / 100.0);
     chance.clamp(0.05, 0.95)
 }
 

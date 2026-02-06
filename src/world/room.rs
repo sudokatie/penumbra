@@ -106,17 +106,32 @@ impl Room {
     }
 
     /// Determine enemy type from commit data.
+    /// Spec: Bug (<20 lines), Regression (revert), TechDebt (old code), MergeConflict (merge)
     fn enemy_type_from_commit(commit: &CommitData) -> EnemyType {
-        let msg = commit.message.to_lowercase();
-        if msg.contains("merge") {
-            EnemyType::MergeConflict
-        } else if msg.contains("revert") || msg.contains("rollback") {
-            EnemyType::Regression
-        } else if msg.contains("debt") || msg.contains("refactor") || msg.contains("cleanup") {
-            EnemyType::TechDebt
-        } else {
-            EnemyType::Bug
+        // Merge commits spawn MergeConflict
+        if commit.is_merge {
+            return EnemyType::MergeConflict;
         }
+        
+        let msg = commit.message.to_lowercase();
+        
+        // Revert commits spawn Regression
+        if msg.contains("revert") || msg.contains("rollback") {
+            return EnemyType::Regression;
+        }
+        
+        // Refactor/cleanup/debt commits spawn TechDebt
+        if msg.contains("debt") || msg.contains("refactor") || msg.contains("cleanup") {
+            return EnemyType::TechDebt;
+        }
+        
+        // Small commits (<20 lines) spawn Bug per spec
+        if commit.lines_changed() < 20 {
+            return EnemyType::Bug;
+        }
+        
+        // Larger commits also spawn TechDebt (accumulating complexity)
+        EnemyType::TechDebt
     }
 
     /// Spawn enemies based on commits.

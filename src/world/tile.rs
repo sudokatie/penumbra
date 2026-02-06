@@ -19,12 +19,13 @@ pub enum Tile {
     Door(Direction),
     Exit,
     Entrance,
+    HealingZone, // Sanctuary room special tile
 }
 
 impl Tile {
     /// Check if entities can walk on this tile.
     pub fn is_walkable(&self) -> bool {
-        matches!(self, Tile::Floor | Tile::Door(_) | Tile::Exit | Tile::Entrance)
+        matches!(self, Tile::Floor | Tile::Door(_) | Tile::Exit | Tile::Entrance | Tile::HealingZone)
     }
 
     /// Check if this tile blocks vision.
@@ -40,6 +41,7 @@ impl Tile {
             Tile::Door(_) => '+',
             Tile::Exit => '>',
             Tile::Entrance => '<',
+            Tile::HealingZone => '*',
         }
     }
 }

@@ -196,8 +196,9 @@ fn calculate_room_size_large() {
 
 #[test]
 fn calculate_room_size_huge() {
-    assert_eq!(calculate_room_size(500), (11, 11));
-    assert_eq!(calculate_room_size(1000), (11, 11));
+    // Max room size is 9x9 per spec
+    assert_eq!(calculate_room_size(500), (9, 9));
+    assert_eq!(calculate_room_size(1000), (9, 9));
 }
 
 #[test]
@@ -327,6 +328,32 @@ fn make_commit_typed(message: &str) -> CommitData {
     }
 }
 
+fn make_small_commit(message: &str) -> CommitData {
+    CommitData {
+        hash: format!("hash_{}", message.len()),
+        date: Utc::now(),
+        message: message.to_string(),
+        insertions: 10, // Small commit < 20 lines
+        deletions: 0,
+        files_changed: 1,
+        author: "Test".to_string(),
+        is_merge: false,
+    }
+}
+
+fn make_merge_commit(message: &str) -> CommitData {
+    CommitData {
+        hash: format!("hash_{}", message.len()),
+        date: Utc::now(),
+        message: message.to_string(),
+        insertions: 50,
+        deletions: 0,
+        files_changed: 1,
+        author: "Test".to_string(),
+        is_merge: true,
+    }
+}
+
 #[test]
 fn spawn_enemies_creates_enemies() {
     let date = NaiveDate::from_ymd_opt(2026, 1, 1).unwrap();
@@ -350,10 +377,11 @@ fn spawn_enemies_respects_count_limit() {
 }
 
 #[test]
-fn spawn_enemies_bug_type_for_regular_commits() {
+fn spawn_enemies_bug_type_for_small_commits() {
     let date = NaiveDate::from_ymd_opt(2026, 1, 1).unwrap();
     let mut room = Room::new(0, 7, 7, RoomType::Normal, date);
-    let commits = vec![make_commit_typed("Fix something")];
+    // Bug spawns from small commits (<20 lines) per spec
+    let commits = vec![make_small_commit("Fix something")];
     let mut rng = ChaCha8Rng::seed_from_u64(42);
     room.spawn_enemies(&commits, &mut rng);
     assert_eq!(room.enemies[0].enemy_type, EnemyType::Bug);
@@ -363,7 +391,8 @@ fn spawn_enemies_bug_type_for_regular_commits() {
 fn spawn_enemies_merge_conflict_for_merge() {
     let date = NaiveDate::from_ymd_opt(2026, 1, 1).unwrap();
     let mut room = Room::new(0, 7, 7, RoomType::Normal, date);
-    let commits = vec![make_commit_typed("Merge branch feature")];
+    // MergeConflict spawns from merge commits (is_merge = true)
+    let commits = vec![make_merge_commit("Merge branch feature")];
     let mut rng = ChaCha8Rng::seed_from_u64(42);
     room.spawn_enemies(&commits, &mut rng);
     assert_eq!(room.enemies[0].enemy_type, EnemyType::MergeConflict);
