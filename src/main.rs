@@ -4,6 +4,8 @@ use std::path::PathBuf;
 
 use clap::{Parser, Subcommand};
 
+use penumbra::cli;
+
 #[derive(Parser)]
 #[command(name = "penumbra")]
 #[command(about = "A roguelike where dungeons generate from your git history")]
@@ -40,23 +42,20 @@ enum Commands {
 fn main() {
     let cli = Cli::parse();
 
-    match cli.command {
+    let result = match cli.command {
         Commands::Play { git, days, seed } => {
-            println!("Starting new game...");
-            println!("  Git path: {}", git.display());
-            println!("  Days: {}", days);
-            if let Some(s) = seed {
-                println!("  Seed: {}", s);
-            }
-            // TODO: Implement game start
+            cli::play(&git, days, seed, None)
         }
         Commands::Continue => {
-            println!("Continuing saved game...");
-            // TODO: Implement continue
+            cli::continue_game()
         }
         Commands::History => {
-            println!("Run history:");
-            // TODO: Implement history
+            cli::show_history()
         }
+    };
+
+    if let Err(e) = result {
+        eprintln!("Error: {:#}", e);
+        std::process::exit(1);
     }
 }
