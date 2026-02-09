@@ -66,6 +66,15 @@ penumbra history
 - **Tech Debt** (D): Old code touched. Grows stronger each turn.
 - **Merge Conflict** (M): Merge commits. Splits in two at half health.
 
+## Roadmap
+
+### v0.2 (Planned)
+- [ ] More data sources (calendar, email)
+- [ ] Character progression persistence between runs
+- [ ] File category analysis for room types
+
+See FEATURE-BACKLOG.md in the clawd repo for detailed acceptance criteria.
+
 ## License
 
 MIT
