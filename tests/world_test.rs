@@ -192,6 +192,7 @@ fn make_commit(lines: u32, is_merge: bool, message: &str) -> CommitData {
         files_changed: 1,
         author: "Test".to_string(),
         is_merge,
+        file_categories: Default::default(),
     }
 }
 
@@ -349,7 +350,7 @@ fn make_commit_typed(message: &str) -> CommitData {
         deletions: 0,
         files_changed: 1,
         author: "Test".to_string(),
-        is_merge: false,
+        is_merge: false, file_categories: Default::default(),
     }
 }
 
@@ -362,7 +363,7 @@ fn make_small_commit(message: &str) -> CommitData {
         deletions: 0,
         files_changed: 1,
         author: "Test".to_string(),
-        is_merge: false,
+        is_merge: false, file_categories: Default::default(),
     }
 }
 
@@ -376,6 +377,7 @@ fn make_merge_commit(message: &str) -> CommitData {
         files_changed: 1,
         author: "Test".to_string(),
         is_merge: true,
+        file_categories: Default::default(),
     }
 }
 
@@ -483,7 +485,7 @@ fn make_commit_lines(message: &str, lines: u32) -> CommitData {
         deletions: 0,
         files_changed: 1,
         author: "Test".to_string(),
-        is_merge: false,
+        is_merge: false, file_categories: Default::default(),
     }
 }
 

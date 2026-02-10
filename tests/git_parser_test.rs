@@ -134,7 +134,7 @@ fn group_by_date_groups_correctly() {
             deletions: 5,
             files_changed: 1,
             author: "Test".to_string(),
-            is_merge: false,
+            is_merge: false, file_categories: Default::default(),
         },
         CommitData {
             hash: "b".to_string(),
@@ -144,7 +144,7 @@ fn group_by_date_groups_correctly() {
             deletions: 10,
             files_changed: 2,
             author: "Test".to_string(),
-            is_merge: false,
+            is_merge: false, file_categories: Default::default(),
         },
     ];
 
@@ -163,7 +163,7 @@ fn commit_data_lines_changed() {
         deletions: 50,
         files_changed: 5,
         author: "Test".to_string(),
-        is_merge: false,
+        is_merge: false, file_categories: Default::default(),
     };
     assert_eq!(commit.lines_changed(), 150);
 }

@@ -38,7 +38,7 @@ pub fn parse_repository(path: &Path, days: u32) -> Result<Vec<CommitData>, GitEr
             break;
         }
 
-        let stats = get_commit_stats(&repo, &commit)?;
+        let (stats, categories) = get_commit_stats_and_categories(&repo, &commit)?;
         let is_merge = commit.parent_count() > 1;
 
         commits.push(CommitData {
@@ -50,6 +50,7 @@ pub fn parse_repository(path: &Path, days: u32) -> Result<Vec<CommitData>, GitEr
             files_changed: stats.files_changed,
             author: commit.author().name().unwrap_or("unknown").to_string(),
             is_merge,
+            file_categories: categories,
         });
     }
 
@@ -62,8 +63,11 @@ pub fn parse_repository(path: &Path, days: u32) -> Result<Vec<CommitData>, GitEr
     Ok(commits)
 }
 
-/// Get statistics for a single commit.
-pub fn get_commit_stats(repo: &Repository, commit: &Commit) -> Result<CommitStats, GitError> {
+/// Get statistics and file categories for a single commit.
+pub fn get_commit_stats_and_categories(
+    repo: &Repository,
+    commit: &Commit,
+) -> Result<(CommitStats, FileCategories), GitError> {
     let tree = commit.tree()?;
 
     let parent_tree = if commit.parent_count() > 0 {
@@ -76,12 +80,22 @@ pub fn get_commit_stats(repo: &Repository, commit: &Commit) -> Result<CommitStat
     let diff = repo.diff_tree_to_tree(parent_tree.as_ref(), Some(&tree), Some(&mut opts))?;
 
     let stats = diff.stats()?;
+    let categories = categorize_files(&diff);
 
-    Ok(CommitStats {
-        insertions: stats.insertions() as u32,
-        deletions: stats.deletions() as u32,
-        files_changed: stats.files_changed() as u32,
-    })
+    Ok((
+        CommitStats {
+            insertions: stats.insertions() as u32,
+            deletions: stats.deletions() as u32,
+            files_changed: stats.files_changed() as u32,
+        },
+        categories,
+    ))
+}
+
+/// Get statistics for a single commit (for backward compatibility).
+pub fn get_commit_stats(repo: &Repository, commit: &Commit) -> Result<CommitStats, GitError> {
+    let (stats, _) = get_commit_stats_and_categories(repo, commit)?;
+    Ok(stats)
 }
 
 /// Group commits by date.

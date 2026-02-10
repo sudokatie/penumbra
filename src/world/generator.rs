@@ -63,8 +63,35 @@ pub fn determine_room_type(commits: &[CommitData]) -> RoomType {
         return RoomType::Boss;
     }
 
-    // TODO: Analyze file categories when we have that data
-    // For now, use message-based heuristics
+    // Aggregate file categories across all commits
+    let mut total_test_files = 0u32;
+    let mut total_config_files = 0u32;
+    let mut total_doc_files = 0u32;
+    let mut total_other_files = 0u32;
+
+    for commit in commits {
+        total_test_files += commit.file_categories.test_files;
+        total_config_files += commit.file_categories.config_files;
+        total_doc_files += commit.file_categories.doc_files;
+        total_other_files += commit.file_categories.other_files;
+    }
+
+    let total_files = total_test_files + total_config_files + total_doc_files + total_other_files;
+
+    if total_files > 0 {
+        // Test-heavy rooms become sanctuaries (safe resting areas)
+        if total_test_files * 2 > total_files {
+            return RoomType::Sanctuary;
+        }
+        // Config-heavy rooms become treasure rooms
+        if total_config_files * 2 > total_files {
+            return RoomType::Treasure;
+        }
+        // Doc-heavy rooms become libraries (TODO: add RoomType::Library)
+        // For now, treat as normal
+    }
+
+    // Fall back to message-based heuristics for commits with no file data
     let test_commits = commits
         .iter()
         .filter(|c| {
@@ -82,7 +109,7 @@ pub fn determine_room_type(commits: &[CommitData]) -> RoomType {
         .count();
 
     let total = commits.len();
-    if total > 0 {
+    if total > 0 && total_files == 0 {
         if test_commits * 2 > total {
             return RoomType::Sanctuary;
         }

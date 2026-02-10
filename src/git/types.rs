@@ -15,6 +15,7 @@ pub struct CommitData {
     pub files_changed: u32,
     pub author: String,
     pub is_merge: bool,
+    pub file_categories: FileCategories,
 }
 
 /// Statistics for a commit diff.
@@ -26,7 +27,7 @@ pub struct CommitStats {
 }
 
 /// Categorized file counts from a commit.
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct FileCategories {
     pub test_files: u32,
     pub config_files: u32,

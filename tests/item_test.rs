@@ -94,7 +94,7 @@ fn make_commit(message: &str, lines: u32) -> CommitData {
         deletions: 0,
         files_changed: 1,
         author: "Test".to_string(),
-        is_merge: false,
+        is_merge: false, file_categories: Default::default(),
     }
 }
 
