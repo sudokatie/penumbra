@@ -68,10 +68,10 @@ penumbra history
 
 ## Roadmap
 
-### v0.2 (Planned)
+### v0.2 (Partial)
 - [ ] More data sources (calendar, email)
 - [ ] Character progression persistence between runs
-- [ ] File category analysis for room types
+- [x] File category analysis for room types (test->Sanctuary, config->Treasure)
 
 See FEATURE-BACKLOG.md in the clawd repo for detailed acceptance criteria.
 
