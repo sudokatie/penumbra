@@ -20,6 +20,7 @@ Penumbra transforms your git history into a playable dungeon. Busy weeks spawn m
 - Items generated from file categories
 - Field of view with shadowcasting
 - Save/load for long dungeon runs
+- Meta-progression: permanent upgrades that persist between runs
 
 ## Quick Start
 
@@ -66,11 +67,27 @@ penumbra history
 - **Tech Debt** (D): Old code touched. Grows stronger each turn.
 - **Merge Conflict** (M): Merge commits. Splits in two at half health.
 
+## Meta-Progression
+
+Each run earns Essence based on your performance:
+- 1 per enemy killed
+- 5 per room cleared
+- 20 for victory
+
+Spend Essence on permanent upgrades:
+- **HP Bonus**: +5 max HP per level (5 levels)
+- **Energy Bonus**: +2 max energy per level (5 levels)
+- **Damage Bonus**: +1 base damage per level (3 levels)
+- **Starting Weapon**: Better initial gear (2 levels)
+- **Loot Luck**: +5% better item chance per level (3 levels)
+
+Progress persists in `~/.penumbra/progression.json`.
+
 ## Roadmap
 
 ### v0.2 (Partial)
 - [ ] More data sources (calendar, email)
-- [ ] Character progression persistence between runs
+- [x] Character progression persistence between runs
 - [x] File category analysis for room types (test->Sanctuary, config->Treasure)
 
 See FEATURE-BACKLOG.md in the clawd repo for detailed acceptance criteria.
