@@ -31,6 +31,9 @@ penumbra play
 # Play with specific repo and more history
 penumbra play --git ~/projects/myapp --days 60
 
+# Play from your calendar (ICS file)
+penumbra play --calendar ~/calendar.ics --days 30
+
 # Continue a saved game
 penumbra continue
 
@@ -39,6 +42,8 @@ penumbra history
 ```
 
 ## How Generation Works
+
+### From Git
 
 | Git Data | Dungeon Element |
 |----------|-----------------|
@@ -49,6 +54,22 @@ penumbra history
 | Config files | Treasure room |
 | Commit count | Enemy count |
 | Commit size | Enemy difficulty |
+
+### From Calendar
+
+Your calendar becomes the dungeon too. Export your calendar as ICS and watch your meetings transform into monsters.
+
+| Calendar Data | Dungeon Element |
+|---------------|-----------------|
+| Day with events | Room |
+| Meeting duration + attendees | Room size |
+| All-hands / 10+ attendees | Boss room |
+| Focus time / breaks | Sanctuary |
+| 1:1 meetings | Treasure room |
+| Event count | Enemy count |
+| Meeting length | Enemy difficulty |
+
+Export from Google Calendar: Settings > Import & Export > Export
 
 ## Controls
 
