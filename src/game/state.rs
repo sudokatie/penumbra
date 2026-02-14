@@ -92,6 +92,41 @@ impl GameState {
         state
     }
 
+    /// Create a new game from a pre-generated world (for calendar/other sources).
+    pub fn new_from_world(
+        world: World,
+        seed: u64,
+        class: Option<PlayerClass>,
+        source_path: PathBuf,
+    ) -> Self {
+        // Use MeetingSurvivor as default for calendar dungeons, or specified class
+        let player_class = class.unwrap_or(PlayerClass::MeetingSurvivor);
+        let player = Player::new(player_class);
+
+        let mut state = Self {
+            world,
+            player,
+            turn: 0,
+            visible_tiles: HashSet::new(),
+            messages: Vec::new(),
+            game_over: false,
+            victory: false,
+            seed,
+            git_path: source_path,
+            started_at: Utc::now(),
+        };
+
+        // Position player at entrance of first room
+        if let Some(room) = state.world.current() {
+            state.player.x = 1;
+            state.player.y = room.height as i32 / 2;
+        }
+
+        state.update_fov();
+        state.log(format!("You enter the calendar dungeon as a {:?}...", player_class));
+        state
+    }
+
     /// Process a player action and return events.
     pub fn process_action(&mut self, action: PlayerAction) -> Vec<GameEvent> {
         if self.game_over {

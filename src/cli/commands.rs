@@ -8,10 +8,12 @@ use crossterm::terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScree
 use crossterm::ExecutableCommand;
 use ratatui::prelude::*;
 
+use crate::calendar::parse_ics_file;
 use crate::entity::PlayerClass;
 use crate::game::{load_game, save_exists, save_game, GameState, load_run_history};
 use crate::git::parse_repository;
 use crate::ui::App;
+use crate::world::generate_dungeon_from_calendar;
 
 /// Start a new game.
 pub fn play(git_path: &Path, days: u32, seed: Option<u64>, class: Option<PlayerClass>) -> Result<()> {
@@ -63,6 +65,64 @@ pub fn play(git_path: &Path, days: u32, seed: Option<u64>, class: Option<PlayerC
         println!("Congratulations! You conquered the dungeon!");
     } else if app.state.game_over {
         println!("Game over. Better luck next time!");
+    }
+
+    Ok(())
+}
+
+/// Start a new game from calendar data.
+pub fn play_calendar(calendar_path: &Path, days: u32, seed: Option<u64>, class: Option<PlayerClass>) -> Result<()> {
+    // Parse calendar file
+    let events = parse_ics_file(calendar_path, days)
+        .context("Failed to parse calendar file")?;
+
+    println!("Found {} events over {} days", events.len(), days);
+    println!("Generating dungeon from calendar...");
+
+    // Generate seed if not provided
+    let seed = seed.unwrap_or_else(|| {
+        use std::time::{SystemTime, UNIX_EPOCH};
+        SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_secs()
+    });
+
+    // Generate world from calendar
+    let world = generate_dungeon_from_calendar(&events, seed);
+
+    // Create game state
+    let state = GameState::new_from_world(world, seed, class, calendar_path.to_path_buf());
+
+    println!("Created {} rooms", state.world.rooms.len());
+    println!("Starting game...");
+
+    // Setup terminal
+    enable_raw_mode()?;
+    let mut stdout = io::stdout();
+    stdout.execute(EnterAlternateScreen)?;
+    let backend = CrosstermBackend::new(stdout);
+    let mut terminal = Terminal::new(backend)?;
+
+    // Run game
+    let mut app = App::new(state);
+    let result = app.run(&mut terminal);
+
+    // Save if game ended properly
+    if !app.quit {
+        let _ = save_game(&app.state);
+    }
+
+    // Restore terminal
+    disable_raw_mode()?;
+    io::stdout().execute(LeaveAlternateScreen)?;
+
+    result.context("Game error")?;
+
+    if app.state.victory {
+        println!("Congratulations! You conquered the calendar dungeon!");
+    } else if app.state.game_over {
+        println!("Game over. Your schedule defeated you!");
     }
 
     Ok(())

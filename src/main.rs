@@ -40,9 +40,13 @@ struct Cli {
 enum Commands {
     /// Start a new game
     Play {
-        /// Path to git repository
+        /// Path to git repository (default data source)
         #[arg(long, default_value = ".")]
         git: PathBuf,
+
+        /// Path to ICS calendar file (alternative data source)
+        #[arg(long)]
+        calendar: Option<PathBuf>,
 
         /// Days of history to use
         #[arg(long, default_value = "30")]
@@ -68,8 +72,12 @@ fn main() {
     let cli = Cli::parse();
 
     let result = match cli.command {
-        Commands::Play { git, days, seed, class } => {
-            cli::play(&git, days, seed, class.map(|c| c.into()))
+        Commands::Play { git, calendar, days, seed, class } => {
+            if let Some(cal_path) = calendar {
+                cli::play_calendar(&cal_path, days, seed, class.map(|c| c.into()))
+            } else {
+                cli::play(&git, days, seed, class.map(|c| c.into()))
+            }
         }
         Commands::Continue => {
             cli::continue_game()
