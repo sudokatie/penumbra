@@ -1,5 +1,6 @@
 //! Penumbra - A roguelike where dungeons generate from your git history.
 
+pub mod calendar;
 pub mod cli;
 pub mod combat;
 pub mod config;
