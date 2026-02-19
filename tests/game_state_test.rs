@@ -3,8 +3,6 @@
 use std::path::PathBuf;
 
 use chrono::{NaiveDate, Utc};
-use rand::SeedableRng;
-use rand_chacha::ChaCha8Rng;
 use penumbra::combat::PlayerAction;
 use penumbra::entity::{Enemy, EnemyType, Player, PlayerClass};
 use penumbra::game::GameState;
@@ -81,7 +79,7 @@ fn game_over_on_player_death() {
     state.player = player;
     
     // Process enemies (they'll attack and kill the player)
-    let events = state.process_enemies();
+    let _events = state.process_enemies();
     
     // Should trigger game over
     assert!(state.game_over);
@@ -206,7 +204,7 @@ fn fov_updates_after_transition() {
     state.player = player;
     state.update_fov();
     
-    let fov_before = state.visible_tiles.clone();
+    let _fov_before = state.visible_tiles.clone();
     
     state.check_room_exit();
     

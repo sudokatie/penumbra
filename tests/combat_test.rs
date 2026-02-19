@@ -17,7 +17,7 @@ use penumbra::world::{Room, RoomType};
 #[test]
 fn player_attack_can_hit() {
     let player = Player::new(PlayerClass::CodeWarrior);
-    let mut enemy = Enemy::new(EnemyType::Bug, 0, 0, "");
+    let _enemy = Enemy::new(EnemyType::Bug, 0, 0, "");
     let mut rng = ChaCha8Rng::seed_from_u64(12345);
     
     // Run multiple attacks, at least one should hit
@@ -50,7 +50,7 @@ fn player_attack_applies_damage() {
 #[test]
 fn player_attack_can_miss() {
     let player = Player::new(PlayerClass::Wanderer);
-    let mut enemy = Enemy::new(EnemyType::Bug, 0, 0, "");
+    let _enemy = Enemy::new(EnemyType::Bug, 0, 0, "");
     let mut rng = ChaCha8Rng::seed_from_u64(12345);
     
     let mut miss_count = 0;

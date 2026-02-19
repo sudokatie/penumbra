@@ -7,7 +7,7 @@ use chrono::Utc;
 use tempfile::TempDir;
 
 use penumbra::git::{
-    categorize_files, group_by_date, parse_repository, CommitData, FileCategories, GitError,
+    group_by_date, parse_repository, CommitData, GitError,
 };
 
 /// Create a temp git repo with some commits for testing.

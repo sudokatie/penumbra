@@ -7,7 +7,7 @@ use std::path::PathBuf;
 
 use chrono::Utc;
 use penumbra::game::{
-    save_game, load_game, save_run_history, load_run_history, 
+    save_game, load_run_history, 
     save_exists, delete_save, GameState, RunRecord,
 };
 use penumbra::git::CommitData;
