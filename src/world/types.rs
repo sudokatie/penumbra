@@ -13,6 +13,8 @@ pub enum RoomType {
     Sanctuary,
     /// Config file room - extra loot.
     Treasure,
+    /// Doc file room - knowledge/hints.
+    Library,
     /// Merge commit room - boss encounter.
     Boss,
 }
@@ -24,6 +26,7 @@ impl RoomType {
             RoomType::Normal => "Room",
             RoomType::Sanctuary => "Sanctuary",
             RoomType::Treasure => "Treasury",
+            RoomType::Library => "Library",
             RoomType::Boss => "Boss Chamber",
         }
     }

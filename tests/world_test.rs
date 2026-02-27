@@ -100,6 +100,7 @@ fn room_type_names() {
     assert_eq!(RoomType::Normal.name(), "Room");
     assert_eq!(RoomType::Sanctuary.name(), "Sanctuary");
     assert_eq!(RoomType::Treasure.name(), "Treasury");
+    assert_eq!(RoomType::Library.name(), "Library");
     assert_eq!(RoomType::Boss.name(), "Boss Chamber");
 }
 
@@ -255,6 +256,30 @@ fn determine_room_type_treasure_for_config() {
 fn determine_room_type_normal_for_regular() {
     let commits = vec![make_commit(100, false, "Fix bug in auth")];
     assert_eq!(determine_room_type(&commits), RoomType::Normal);
+}
+
+#[test]
+fn determine_room_type_library_for_docs() {
+    use penumbra::git::FileCategories;
+    let commits = vec![
+        CommitData {
+            hash: "doc1".to_string(),
+            date: Utc::now(),
+            message: "Update README".to_string(),
+            insertions: 50,
+            deletions: 0,
+            files_changed: 2,
+            author: "Test".to_string(),
+            is_merge: false,
+            file_categories: FileCategories {
+                test_files: 0,
+                config_files: 0,
+                doc_files: 2,
+                other_files: 0,
+            },
+        },
+    ];
+    assert_eq!(determine_room_type(&commits), RoomType::Library);
 }
 
 #[test]

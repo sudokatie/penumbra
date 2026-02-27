@@ -229,15 +229,16 @@ impl Room {
     /// - Test commits: Healing items
     /// - Config commits: Buff items
     /// - Treasure rooms: 2-3 items
+    /// - Library rooms: 2-3 items (more scrolls)
     pub fn spawn_items<R: Rng>(&mut self, commits: &[CommitData], rng: &mut R) {
         let mut positions = self.get_free_positions();
         if positions.is_empty() {
             return;
         }
 
-        // Treasure rooms get extra items
+        // Treasure and Library rooms get extra items
         let item_count = match self.room_type {
-            RoomType::Treasure => rng.gen_range(2..=3),
+            RoomType::Treasure | RoomType::Library => rng.gen_range(2..=3),
             _ => {
                 // Normal rooms: ~1 item per 3-4 commits
                 let base = commits.len() / 4;

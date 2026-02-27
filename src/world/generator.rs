@@ -88,8 +88,10 @@ pub fn determine_room_type(commits: &[CommitData]) -> RoomType {
         if total_config_files * 2 > total_files {
             return RoomType::Treasure;
         }
-        // Doc-heavy rooms become libraries (TODO: add RoomType::Library)
-        // For now, treat as normal
+        // Doc-heavy rooms become libraries (knowledge/hints)
+        if total_doc_files * 2 > total_files {
+            return RoomType::Library;
+        }
     }
 
     // Fall back to message-based heuristics for commits with no file data
