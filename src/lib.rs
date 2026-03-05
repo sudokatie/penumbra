@@ -4,6 +4,7 @@ pub mod calendar;
 pub mod cli;
 pub mod combat;
 pub mod config;
+pub mod email;
 pub mod entity;
 pub mod fov;
 pub mod game;
