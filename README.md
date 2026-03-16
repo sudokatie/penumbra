@@ -13,8 +13,9 @@ Penumbra transforms your git history into a playable dungeon. Busy weeks spawn m
 ## Features
 
 - Terminal-based roguelike with ASCII graphics
-- Dungeon generated from git commit history
+- Dungeon generated from git history, calendar, or email
 - Turn-based tactical combat
+- Local multiplayer (2 players, same keyboard)
 - Permadeath (because roguelikes)
 - Enemies spawned from commit types
 - Items generated from file categories
@@ -33,6 +34,12 @@ penumbra play --git ~/projects/myapp --days 60
 
 # Play from your calendar (ICS file)
 penumbra play --calendar ~/calendar.ics --days 30
+
+# Play from your email inbox (mbox format)
+penumbra play --email ~/mail.mbox
+
+# Two-player local co-op
+penumbra play --multiplayer
 
 # Continue a saved game
 penumbra continue
@@ -70,6 +77,33 @@ Your calendar becomes the dungeon too. Export your calendar as ICS and watch you
 | Meeting length | Enemy difficulty |
 
 Export from Google Calendar: Settings > Import & Export > Export
+
+### From Email
+
+Your inbox becomes the dungeon. Export your email as mbox format.
+
+| Email Data | Dungeon Element |
+|------------|-----------------|
+| Unread count | Difficulty multiplier |
+| Sender names | NPC names |
+| Subject lines | Item names |
+| Urgent keywords | Boss encounters |
+| Reply chains | Room depth |
+
+```bash
+penumbra play --email ~/mail.mbox
+```
+
+## Multiplayer
+
+Local co-op for two players on the same keyboard.
+
+| Player 1 | Player 2 | Action |
+|----------|----------|--------|
+| Arrow keys | WASD | Move |
+| Space | E | Attack |
+
+Enable with `--multiplayer` flag. Both players share the same dungeon, take turns, and can share items and XP (configurable).
 
 ## Controls
 
