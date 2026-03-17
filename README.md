@@ -94,6 +94,21 @@ Your inbox becomes the dungeon. Export your email as mbox format.
 penumbra play --email ~/mail.mbox
 ```
 
+### From IMAP (Live Email)
+
+Connect directly to your email server without exporting:
+
+```bash
+penumbra play --imap imap.gmail.com --imap-user you@gmail.com
+```
+
+You'll be prompted for your password. For Gmail, use an app password (not your regular password).
+
+Configuration options:
+- `--imap-port` - Server port (default: 993)
+- `--imap-folder` - Folder to scan (default: INBOX)
+- `--imap-limit` - Max emails to fetch (default: 100)
+
 ## Multiplayer
 
 Local co-op for two players on the same keyboard.
