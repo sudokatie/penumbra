@@ -270,6 +270,158 @@ pub fn determine_room_type_from_events(events: &[EventData]) -> RoomType {
     RoomType::Normal
 }
 
+// ============================================================================
+// Email-based dungeon generation
+// ============================================================================
+
+/// Generate a complete dungeon from email data.
+pub fn generate_dungeon_from_email(emails: &[crate::email::EmailData], seed: u64) -> World {
+    use std::collections::HashMap;
+    
+    let mut rng = ChaCha8Rng::seed_from_u64(seed);
+    
+    // Group emails by date
+    let mut grouped: HashMap<NaiveDate, Vec<&crate::email::EmailData>> = HashMap::new();
+    for email in emails {
+        let date = email.date.date_naive();
+        grouped.entry(date).or_default().push(email);
+    }
+    
+    // Sort by date
+    let mut dates: Vec<_> = grouped.keys().copied().collect();
+    dates.sort();
+    
+    let mut rooms = Vec::new();
+    
+    for (index, date) in dates.iter().enumerate() {
+        let day_emails = &grouped[date];
+        let room = generate_room_from_emails(date, day_emails, index, &mut rng);
+        rooms.push(room);
+    }
+    
+    // Place connections between rooms
+    place_connections(&mut rooms);
+    
+    World::new(rooms)
+}
+
+/// Generate a single room from a day's emails.
+pub fn generate_room_from_emails(
+    date: &NaiveDate,
+    emails: &[&crate::email::EmailData],
+    index: usize,
+    rng: &mut impl Rng,
+) -> Room {
+    // Calculate total intensity from emails
+    let total_intensity: u32 = emails.iter().map(|e| e.intensity()).sum();
+    let (width, height) = calculate_room_size_from_intensity(total_intensity);
+    let room_type = determine_room_type_from_emails(emails);
+    
+    let mut room = Room::new(index, width, height, room_type, *date);
+    
+    generate_layout(&mut room, rng);
+    
+    room
+}
+
+/// Determine room type from email data.
+pub fn determine_room_type_from_emails(emails: &[&crate::email::EmailData]) -> RoomType {
+    use crate::email::EmailUrgency;
+    
+    // Urgent emails = boss room
+    if emails.iter().any(|e| e.urgency == EmailUrgency::Urgent) {
+        return RoomType::Boss;
+    }
+    
+    // Count categories
+    let mut low_priority = 0;
+    let mut important = 0;
+    
+    for email in emails {
+        match email.urgency {
+            EmailUrgency::Low => low_priority += 1,
+            EmailUrgency::Important => important += 1,
+            _ => {}
+        }
+    }
+    
+    let total = emails.len();
+    if total == 0 {
+        return RoomType::Normal;
+    }
+    
+    // Low priority / newsletter heavy = Sanctuary (light reading)
+    if low_priority * 2 > total {
+        return RoomType::Sanctuary;
+    }
+    
+    // Important emails = Treasure (valuable info)
+    if important * 2 > total {
+        return RoomType::Treasure;
+    }
+    
+    RoomType::Normal
+}
+
+#[cfg(test)]
+mod email_tests {
+    use super::*;
+    use chrono::{TimeZone, Utc};
+    use crate::email::{EmailData, EmailUrgency};
+    
+    fn make_email(subject: &str, urgency: EmailUrgency, is_read: bool) -> EmailData {
+        EmailData {
+            message_id: subject.to_string(),
+            from: "test@example.com".to_string(),
+            from_name: Some("Test User".to_string()),
+            subject: subject.to_string(),
+            date: Utc.with_ymd_and_hms(2026, 2, 15, 10, 0, 0).unwrap(),
+            is_read,
+            urgency,
+            recipient_count: 1,
+            is_reply: false,
+            thread_depth: 0,
+        }
+    }
+    
+    #[test]
+    fn test_urgent_email_creates_boss_room() {
+        let emails = vec![make_email("URGENT: Server down", EmailUrgency::Urgent, false)];
+        let refs: Vec<_> = emails.iter().collect();
+        assert_eq!(determine_room_type_from_emails(&refs), RoomType::Boss);
+    }
+    
+    #[test]
+    fn test_low_priority_creates_sanctuary() {
+        let emails = vec![
+            make_email("Weekly Newsletter", EmailUrgency::Low, true),
+            make_email("FYI: New policy", EmailUrgency::Low, true),
+        ];
+        let refs: Vec<_> = emails.iter().collect();
+        assert_eq!(determine_room_type_from_emails(&refs), RoomType::Sanctuary);
+    }
+    
+    #[test]
+    fn test_important_creates_treasure() {
+        let emails = vec![
+            make_email("Important: Review needed", EmailUrgency::Important, false),
+            make_email("Action Required", EmailUrgency::Important, false),
+        ];
+        let refs: Vec<_> = emails.iter().collect();
+        assert_eq!(determine_room_type_from_emails(&refs), RoomType::Treasure);
+    }
+    
+    #[test]
+    fn test_mixed_emails_create_normal() {
+        let emails = vec![
+            make_email("Hello", EmailUrgency::Normal, true),
+            make_email("Meeting notes", EmailUrgency::Normal, true),
+        ];
+        let refs: Vec<_> = emails.iter().collect();
+        assert_eq!(determine_room_type_from_emails(&refs), RoomType::Normal);
+    }
+}
+
 #[cfg(test)]
 mod calendar_tests {
     use super::*;

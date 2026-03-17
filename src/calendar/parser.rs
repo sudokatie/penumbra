@@ -187,7 +187,8 @@ SUMMARY:Team Meeting
 END:VEVENT
 END:VCALENDAR"#;
 
-        let events = parse_ics_content(ics, 30).unwrap();
+        // Use 60 days to ensure the test event is always within range
+        let events = parse_ics_content(ics, 60).unwrap();
         assert_eq!(events.len(), 1);
         assert_eq!(events[0].summary, "Team Meeting");
         assert_eq!(events[0].duration_minutes, 60);

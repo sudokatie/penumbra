@@ -9,11 +9,12 @@ use crossterm::ExecutableCommand;
 use ratatui::prelude::*;
 
 use crate::calendar::parse_ics_file;
+use crate::email::{ImapConfig, parse_mbox_file, fetch_emails};
 use crate::entity::PlayerClass;
 use crate::game::{load_game, save_exists, save_game, GameState, load_run_history};
 use crate::git::parse_repository;
 use crate::ui::App;
-use crate::world::generate_dungeon_from_calendar;
+use crate::world::{generate_dungeon_from_calendar, generate_dungeon_from_email};
 
 /// Start a new game.
 pub fn play(git_path: &Path, days: u32, seed: Option<u64>, class: Option<PlayerClass>) -> Result<()> {
@@ -159,6 +160,135 @@ pub fn continue_game() -> Result<()> {
     io::stdout().execute(LeaveAlternateScreen)?;
 
     result.context("Game error")?;
+
+    Ok(())
+}
+
+/// Start a new game from mbox email file.
+pub fn play_email(email_path: &Path, seed: Option<u64>, class: Option<PlayerClass>) -> Result<()> {
+    // Parse email file
+    let emails = parse_mbox_file(email_path)
+        .context("Failed to parse mbox file")?;
+
+    println!("Found {} emails", emails.len());
+    println!("Generating dungeon from inbox...");
+
+    // Generate seed if not provided
+    let seed = seed.unwrap_or_else(|| {
+        use std::time::{SystemTime, UNIX_EPOCH};
+        SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_secs()
+    });
+
+    // Generate world from emails
+    let world = generate_dungeon_from_email(&emails, seed);
+
+    // Create game state
+    let state = GameState::new_from_world(world, seed, class, email_path.to_path_buf());
+
+    println!("Created {} rooms", state.world.rooms.len());
+    println!("Starting game...");
+
+    // Setup terminal
+    enable_raw_mode()?;
+    let mut stdout = io::stdout();
+    stdout.execute(EnterAlternateScreen)?;
+    let backend = CrosstermBackend::new(stdout);
+    let mut terminal = Terminal::new(backend)?;
+
+    // Run game
+    let mut app = App::new(state);
+    let result = app.run(&mut terminal);
+
+    // Save if game ended properly
+    if !app.quit {
+        let _ = save_game(&app.state);
+    }
+
+    // Restore terminal
+    disable_raw_mode()?;
+    io::stdout().execute(LeaveAlternateScreen)?;
+
+    result.context("Game error")?;
+
+    if app.state.victory {
+        println!("Congratulations! You conquered the inbox dungeon!");
+    } else if app.state.game_over {
+        println!("Game over. Your inbox defeated you!");
+    }
+
+    Ok(())
+}
+
+/// Start a new game from IMAP email server.
+pub fn play_imap(config: &ImapConfig, limit: usize, seed: Option<u64>, class: Option<PlayerClass>) -> Result<()> {
+    // Prompt for password if not provided
+    let mut config = config.clone();
+    if config.password.is_empty() {
+        print!("IMAP Password: ");
+        io::Write::flush(&mut io::stdout())?;
+        let mut password = String::new();
+        io::stdin().read_line(&mut password)?;
+        config.password = password.trim().to_string();
+    }
+
+    println!("Connecting to {}...", config.host);
+
+    // Fetch emails
+    let emails = fetch_emails(&config, limit)
+        .context("Failed to fetch emails from IMAP")?;
+
+    println!("Fetched {} emails", emails.len());
+    println!("Generating dungeon from inbox...");
+
+    // Generate seed if not provided
+    let seed = seed.unwrap_or_else(|| {
+        use std::time::{SystemTime, UNIX_EPOCH};
+        SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_secs()
+    });
+
+    // Generate world from emails
+    let world = generate_dungeon_from_email(&emails, seed);
+
+    // Create game state (use host as source path)
+    let source_path = std::path::PathBuf::from(&config.host);
+    let state = GameState::new_from_world(world, seed, class, source_path);
+
+    println!("Created {} rooms", state.world.rooms.len());
+    println!("Starting game...");
+
+    // Setup terminal
+    enable_raw_mode()?;
+    let mut stdout = io::stdout();
+    stdout.execute(EnterAlternateScreen)?;
+    let backend = CrosstermBackend::new(stdout);
+    let mut terminal = Terminal::new(backend)?;
+
+    // Run game
+    let mut app = App::new(state);
+    let result = app.run(&mut terminal);
+
+    // Save if game ended properly
+    if !app.quit {
+        let _ = save_game(&app.state);
+    }
+
+    // Restore terminal
+    disable_raw_mode()?;
+    io::stdout().execute(LeaveAlternateScreen)?;
+
+    result.context("Game error")?;
+
+    if app.state.victory {
+        println!("Congratulations! You conquered the inbox dungeon!");
+    } else if app.state.game_over {
+        println!("Game over. Your inbox defeated you!");
+    }
 
     Ok(())
 }
