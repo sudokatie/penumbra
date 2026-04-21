@@ -156,9 +156,12 @@ Progress persists in `~/.penumbra/progression.json`.
 ## Roadmap
 
 ### v0.2 (Partial)
-- [ ] More data sources (calendar, email)
+- [x] Calendar data source (ICS parsing, IMAP calendar)
+- [x] Email data source (mbox parsing, IMAP fetch)
 - [x] Character progression persistence between runs
 - [x] File category analysis for room types (test->Sanctuary, config->Treasure)
+- [ ] Weather data source (affects dungeon atmosphere and enemy types)
+- [ ] Spotify/music data source (listening history affects soundtrack and mood)
 
 See FEATURE-BACKLOG.md in the clawd repo for detailed acceptance criteria.
 
