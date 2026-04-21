@@ -11,4 +11,5 @@ pub mod game;
 pub mod git;
 pub mod item;
 pub mod ui;
+pub mod weather;
 pub mod world;

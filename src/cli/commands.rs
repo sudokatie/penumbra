@@ -14,7 +14,8 @@ use crate::entity::PlayerClass;
 use crate::game::{load_game, save_exists, save_game, GameState, load_run_history};
 use crate::git::parse_repository;
 use crate::ui::App;
-use crate::world::{generate_dungeon_from_calendar, generate_dungeon_from_email};
+use crate::weather::{fetch_weather, fetch_weather_by_city};
+use crate::world::{generate_dungeon_from_calendar, generate_dungeon_from_email, generate_dungeon_from_weather};
 
 /// Start a new game.
 pub fn play(git_path: &Path, days: u32, seed: Option<u64>, class: Option<PlayerClass>) -> Result<()> {
@@ -288,6 +289,89 @@ pub fn play_imap(config: &ImapConfig, limit: usize, seed: Option<u64>, class: Op
         println!("Congratulations! You conquered the inbox dungeon!");
     } else if app.state.game_over {
         println!("Game over. Your inbox defeated you!");
+    }
+
+    Ok(())
+}
+
+/// Start a new game from weather data by city name.
+pub fn play_weather_city(city: &str, seed: Option<u64>, class: Option<PlayerClass>) -> Result<()> {
+    println!("Fetching weather for {}...", city);
+
+    // Fetch weather data
+    let weather = fetch_weather_by_city(city)
+        .context("Failed to fetch weather data")?;
+
+    play_weather_internal(weather, seed, class)
+}
+
+/// Start a new game from weather data by coordinates.
+pub fn play_weather_coords(lat: f64, lon: f64, seed: Option<u64>, class: Option<PlayerClass>) -> Result<()> {
+    println!("Fetching weather for ({:.2}, {:.2})...", lat, lon);
+
+    // Fetch weather data
+    let weather = fetch_weather(lat, lon)
+        .context("Failed to fetch weather data")?;
+
+    play_weather_internal(weather, seed, class)
+}
+
+/// Internal function to run game from weather data.
+fn play_weather_internal(weather: crate::weather::WeatherData, seed: Option<u64>, class: Option<PlayerClass>) -> Result<()> {
+    println!("Weather in {}: {} ({:.1}C, {}% humidity, {:.1} km/h wind)",
+        weather.location, weather.description,
+        weather.temperature_c, weather.humidity, weather.wind_speed_kph);
+
+    let atmosphere = crate::weather::generate_atmosphere(&weather);
+    println!("Dungeon atmosphere: {}", atmosphere.description());
+    println!("Difficulty multiplier: {:.2}x", weather.difficulty_multiplier());
+    println!("Generating dungeon from weather...");
+
+    // Generate seed if not provided
+    let seed = seed.unwrap_or_else(|| {
+        use std::time::{SystemTime, UNIX_EPOCH};
+        SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_secs()
+    });
+
+    // Generate world from weather
+    let world = generate_dungeon_from_weather(&weather, seed);
+
+    // Create game state (use location as source path)
+    let source_path = std::path::PathBuf::from(&weather.location);
+    let state = GameState::new_from_world(world, seed, class, source_path);
+
+    println!("Created {} rooms", state.world.rooms.len());
+    println!("Starting game...");
+
+    // Setup terminal
+    enable_raw_mode()?;
+    let mut stdout = io::stdout();
+    stdout.execute(EnterAlternateScreen)?;
+    let backend = CrosstermBackend::new(stdout);
+    let mut terminal = Terminal::new(backend)?;
+
+    // Run game
+    let mut app = App::new(state);
+    let result = app.run(&mut terminal);
+
+    // Save if game ended properly
+    if !app.quit {
+        let _ = save_game(&app.state);
+    }
+
+    // Restore terminal
+    disable_raw_mode()?;
+    io::stdout().execute(LeaveAlternateScreen)?;
+
+    result.context("Game error")?;
+
+    if app.state.victory {
+        println!("Congratulations! You conquered the weather dungeon!");
+    } else if app.state.game_over {
+        println!("Game over. The elements defeated you!");
     }
 
     Ok(())

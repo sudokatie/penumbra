@@ -1,4 +1,4 @@
-//! Dungeon generation from git and calendar data.
+//! Dungeon generation from git, calendar, email, and weather data.
 
 use chrono::NaiveDate;
 use rand::prelude::*;
@@ -6,6 +6,7 @@ use rand_chacha::ChaCha8Rng;
 
 use crate::calendar::{EventCategory, EventData};
 use crate::git::CommitData;
+use crate::weather::{DungeonAtmosphere, WeatherCondition, WeatherData};
 
 use super::{Room, RoomType, Tile, World};
 
@@ -361,6 +362,171 @@ pub fn determine_room_type_from_emails(emails: &[&crate::email::EmailData]) -> R
     }
     
     RoomType::Normal
+}
+
+// ============================================================================
+// Weather-based dungeon generation
+// ============================================================================
+
+/// Generate a complete dungeon from weather data.
+/// Weather creates a unique single-session dungeon with atmosphere modifiers.
+pub fn generate_dungeon_from_weather(weather: &WeatherData, seed: u64) -> World {
+    let mut rng = ChaCha8Rng::seed_from_u64(seed);
+    let atmosphere = crate::weather::generate_atmosphere(weather);
+
+    // Weather dungeons have 5-10 rooms based on difficulty
+    let base_rooms = 5;
+    let extra_rooms = (weather.difficulty_multiplier() * 3.0) as usize;
+    let room_count = (base_rooms + extra_rooms).min(10);
+
+    let mut rooms = Vec::new();
+    let today = chrono::Utc::now().date_naive();
+
+    for index in 0..room_count {
+        let room = generate_room_from_weather(today, weather, &atmosphere, index, &mut rng);
+        rooms.push(room);
+    }
+
+    // Place connections between rooms
+    place_connections(&mut rooms);
+
+    World::new(rooms)
+}
+
+/// Generate a single room based on weather conditions.
+pub fn generate_room_from_weather(
+    date: NaiveDate,
+    weather: &WeatherData,
+    atmosphere: &DungeonAtmosphere,
+    index: usize,
+    rng: &mut impl Rng,
+) -> Room {
+    // Use weather intensity for room size
+    let intensity = weather.intensity();
+    let (width, height) = calculate_room_size_from_intensity(intensity);
+
+    // Determine room type from weather
+    let room_type = determine_room_type_from_weather(weather, atmosphere, index, rng);
+
+    let mut room = Room::new(index, width, height, room_type, date);
+
+    generate_layout(&mut room, rng);
+
+    room
+}
+
+/// Determine room type from weather conditions.
+pub fn determine_room_type_from_weather(
+    weather: &WeatherData,
+    atmosphere: &DungeonAtmosphere,
+    index: usize,
+    rng: &mut impl Rng,
+) -> RoomType {
+    // Last room is always boss for storm/hail
+    if index >= 4 && matches!(weather.condition, WeatherCondition::Storm | WeatherCondition::Hail) {
+        return RoomType::Boss;
+    }
+
+    // Use weather condition bias with some randomness
+    let bias = weather.condition.room_type_bias();
+    let roll: f64 = rng.gen();
+
+    // 40% chance to use weather bias, 60% varied based on atmosphere
+    if roll < 0.4 {
+        return bias;
+    }
+
+    match atmosphere {
+        DungeonAtmosphere::Bright => {
+            // Bright days have more treasures
+            if roll < 0.6 { RoomType::Treasure } else { RoomType::Normal }
+        }
+        DungeonAtmosphere::Misty => {
+            // Misty dungeons have libraries (mystery/knowledge)
+            if roll < 0.6 { RoomType::Library } else { RoomType::Normal }
+        }
+        DungeonAtmosphere::Frozen => {
+            // Frozen dungeons have sanctuaries (shelter)
+            if roll < 0.6 { RoomType::Sanctuary } else { RoomType::Normal }
+        }
+        DungeonAtmosphere::Tempestuous => {
+            // Tempestuous dungeons have boss encounters
+            if roll < 0.55 { RoomType::Boss } else { RoomType::Normal }
+        }
+        DungeonAtmosphere::Dark | DungeonAtmosphere::Dim => {
+            RoomType::Normal
+        }
+    }
+}
+
+#[cfg(test)]
+mod weather_tests {
+    use super::*;
+    use chrono::Utc;
+
+    fn make_weather(condition: WeatherCondition, temp: f64, humidity: u8, wind: f64) -> WeatherData {
+        WeatherData {
+            condition,
+            temperature_c: temp,
+            humidity,
+            wind_speed_kph: wind,
+            description: "Test".to_string(),
+            location: "Test City".to_string(),
+            fetched_at: Utc::now(),
+        }
+    }
+
+    #[test]
+    fn test_generate_dungeon_from_weather() {
+        let weather = make_weather(WeatherCondition::Clear, 20.0, 50, 10.0);
+        let world = generate_dungeon_from_weather(&weather, 42);
+
+        // Should generate at least 5 rooms
+        assert!(world.rooms.len() >= 5);
+        // Should generate at most 10 rooms
+        assert!(world.rooms.len() <= 10);
+    }
+
+    #[test]
+    fn test_storm_creates_more_rooms() {
+        let clear = make_weather(WeatherCondition::Clear, 20.0, 50, 10.0);
+        let storm = make_weather(WeatherCondition::Storm, 20.0, 90, 60.0);
+
+        let clear_world = generate_dungeon_from_weather(&clear, 42);
+        let storm_world = generate_dungeon_from_weather(&storm, 42);
+
+        // Storm should create more rooms due to higher difficulty
+        assert!(storm_world.rooms.len() >= clear_world.rooms.len());
+    }
+
+    #[test]
+    fn test_extreme_weather_has_boss_room() {
+        let weather = make_weather(WeatherCondition::Storm, 35.0, 95, 70.0);
+        let world = generate_dungeon_from_weather(&weather, 42);
+
+        // Should have at least one boss room
+        let boss_count = world.rooms.iter().filter(|r| r.room_type == RoomType::Boss).count();
+        assert!(boss_count > 0);
+    }
+
+    #[test]
+    fn test_weather_room_type_bias() {
+        // Storm biases toward Boss
+        assert_eq!(WeatherCondition::Storm.room_type_bias(), RoomType::Boss);
+        // Fog biases toward Library
+        assert_eq!(WeatherCondition::Fog.room_type_bias(), RoomType::Library);
+        // Snow biases toward Sanctuary
+        assert_eq!(WeatherCondition::Snow.room_type_bias(), RoomType::Sanctuary);
+    }
+
+    #[test]
+    fn test_weather_intensity_affects_room_size() {
+        let mild = make_weather(WeatherCondition::Clear, 20.0, 50, 5.0);
+        let severe = make_weather(WeatherCondition::Storm, -5.0, 90, 60.0);
+
+        // Severe weather should have higher intensity
+        assert!(severe.intensity() > mild.intensity());
+    }
 }
 
 #[cfg(test)]

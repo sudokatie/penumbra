@@ -38,6 +38,12 @@ penumbra play --calendar ~/calendar.ics --days 30
 # Play from your email inbox (mbox format)
 penumbra play --email ~/mail.mbox
 
+# Play from current weather (by city)
+penumbra play --weather-city "Seattle"
+
+# Play from current weather (by coordinates)
+penumbra play --weather-lat 47.6 --weather-lon -122.3
+
 # Two-player local co-op
 penumbra play --multiplayer
 
@@ -109,6 +115,35 @@ Configuration options:
 - `--imap-folder` - Folder to scan (default: INBOX)
 - `--imap-limit` - Max emails to fetch (default: 100)
 
+### From Weather
+
+Current weather conditions affect dungeon atmosphere and difficulty. Uses the free Open-Meteo API (no API key required).
+
+```bash
+# By city name
+penumbra play --weather-city "Tokyo"
+
+# By coordinates
+penumbra play --weather-lat 35.68 --weather-lon 139.76
+```
+
+| Weather Data | Dungeon Element |
+|--------------|-----------------|
+| Clear sky | Bright atmosphere (+2 FOV) |
+| Cloudy | Dim atmosphere |
+| Rain | Dark atmosphere (-2 FOV) |
+| Fog | Misty atmosphere (-4 FOV) |
+| Storm | Tempestuous atmosphere, boss room bias |
+| Snow/Hail | Frozen atmosphere, sanctuary bias |
+| High wind | Tempestuous, more enemies |
+| Extreme temps | Increased difficulty |
+
+Weather affects:
+- **Atmosphere**: Visual theme and FOV radius
+- **Enemy spawns**: Storms spawn 50% more enemies, fog reduces by 20%
+- **Room types**: Snow favors sanctuaries, fog favors libraries, storms favor bosses
+- **Difficulty**: Extreme temperature, humidity, and wind increase challenge
+
 ## Multiplayer
 
 Local co-op for two players on the same keyboard.
@@ -160,7 +195,7 @@ Progress persists in `~/.penumbra/progression.json`.
 - [x] Email data source (mbox parsing, IMAP fetch)
 - [x] Character progression persistence between runs
 - [x] File category analysis for room types (test->Sanctuary, config->Treasure)
-- [ ] Weather data source (affects dungeon atmosphere and enemy types)
+- [x] Weather data source (affects dungeon atmosphere and enemy types)
 - [ ] Spotify/music data source (listening history affects soundtrack and mood)
 
 See FEATURE-BACKLOG.md in the clawd repo for detailed acceptance criteria.

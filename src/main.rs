@@ -72,6 +72,18 @@ enum Commands {
         #[arg(long, default_value = "100")]
         imap_limit: usize,
 
+        /// City name for weather data source
+        #[arg(long)]
+        weather_city: Option<String>,
+
+        /// Latitude for weather data source
+        #[arg(long)]
+        weather_lat: Option<f64>,
+
+        /// Longitude for weather data source
+        #[arg(long)]
+        weather_lon: Option<f64>,
+
         /// Days of history to use
         #[arg(long, default_value = "30")]
         days: u32,
@@ -96,7 +108,7 @@ fn main() {
     let cli = Cli::parse();
 
     let result = match cli.command {
-        Commands::Play { git, calendar, email, imap, imap_user, imap_port, imap_folder, imap_limit, days, seed, class } => {
+        Commands::Play { git, calendar, email, imap, imap_user, imap_port, imap_folder, imap_limit, weather_city, weather_lat, weather_lon, days, seed, class } => {
             if let Some(cal_path) = calendar {
                 cli::play_calendar(&cal_path, days, seed, class.map(|c| c.into()))
             } else if let Some(email_path) = email {
@@ -111,6 +123,10 @@ fn main() {
                     use_tls: true,
                 };
                 cli::play_imap(&imap_config, imap_limit, seed, class.map(|c| c.into()))
+            } else if let Some(city) = weather_city {
+                cli::play_weather_city(&city, seed, class.map(|c| c.into()))
+            } else if let (Some(lat), Some(lon)) = (weather_lat, weather_lon) {
+                cli::play_weather_coords(lat, lon, seed, class.map(|c| c.into()))
             } else {
                 cli::play(&git, days, seed, class.map(|c| c.into()))
             }
